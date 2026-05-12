@@ -74,12 +74,12 @@ ROLE_QUERIES = [
 ]
 
 # ── Seniority filter ─────────────────────────────────────────
-# Skip roles with these keywords in the title.
-# Note: "manager" excludes "Operations Manager" — remove from list if you
-# want manager-level ops roles included.
+# Skip roles with these keywords in the title. "manager" and "lead" used
+# to be here but were dropped — ops/strategy/CoS roles routinely carry
+# those titles at the 1-3yr level we're targeting.
 SKIP_SENIORITY = [
     "senior", "sr.", "staff", "principal", "director",
-    "vp", "vice president", "head of", "manager", "lead",
+    "vp", "vice president", "head of",
 ]
 
 # ── Location allowlist ──────────────────────────────────────
@@ -116,11 +116,15 @@ LOCATION_ALLOW = {
 # If True, remote roles pass the location filter regardless of metro.
 ALLOW_REMOTE = True
 
-# ── Company allowlist ───────────────────────────────────────
-# A role only emails through if its employer matches one of these companies.
-# Matching is normalized (case-insensitive, punctuation/suffix stripped).
-# Add aliases as separate entries if a company shows up under multiple names.
-# Edit weekly: add/remove freely.
+# ── Company allowlist (manifest only) ───────────────────────
+# Note: this list is NOT actively used by the current filters. It's a
+# manifest of companies we care about — useful for our own reference and
+# for figuring out what to wire up in COMPANY_BOARDS below. The actual
+# watchlist scrape is driven by COMPANY_BOARDS, which only contains
+# companies whose ATS slug we've verified.
+#
+# If we later want to filter discovery-mode aggregator results to only
+# these names, filters.is_allowed_company is ready — just wire it in.
 COMPANY_ALLOWLIST = {
     "media_entertainment": [
         "A24",
@@ -282,6 +286,12 @@ COMPANY_BOARDS = {
     "A24":              {"ats": "greenhouse", "slug": "a24"},
     "Block":            {"ats": "greenhouse", "slug": "block"},
 
+    # ── Workday ──
+    "Warner Bros. Discovery": {"ats": "workday", "tenant": "warnerbros", "wd": "wd5", "site": "global"},
+    "Disney":                 {"ats": "workday", "tenant": "disney",     "wd": "wd5", "site": "disneycareer"},
+    "Etsy":                   {"ats": "workday", "tenant": "etsy",       "wd": "wd5", "site": "Etsy_Careers"},
+    "DraftKings":             {"ats": "workday", "tenant": "draftkings", "wd": "wd1", "site": "DraftKings"},
+
     # ── Lever ──
     "Plaid":            {"ats": "lever", "slug": "plaid"},
     "Whoop":            {"ats": "lever", "slug": "whoop"},
@@ -318,13 +328,18 @@ COMPANY_BOARDS = {
     "Superpower":       {"ats": "ashby", "slug": "superpower"},
 
     # ── Not yet covered ──
-    # These companies are either on Workday or use a custom careers portal
-    # we don't have an adapter for. Phase 4 work. The watchlist mode just
-    # won't pull from them until then:
-    #   Coinbase, Function Health, Spring Health, Hims & Hers, Klarna,
-    #   Pipe, Rarible, eBay, Etsy, Arrived, Tally Health, InsideTracker,
-    #   Republic, Beehiiv, Fourthwall, Kajabi, DraftKings, Pomelo, Stori,
-    #   Kushki, Blueprint, Sunday Health, Nue Life Health, Cash App,
-    #   Square, Thrasio, OpenStore, REEF Technology, Paramount,
-    #   Disney, NBCUniversal, Warner Bros. Discovery, Christie's, Sotheby's
+    # Either on a Workday tenant we couldn't locate, on a different ATS we
+    # don't have an adapter for, or behind Cloudflare. Add as we build out.
+    #   - Paramount, NBCUniversal, Klarna: Workday tenants exist but our
+    #     payload gets 422 — site name needs investigation
+    #   - eBay: Phenom People (separate adapter)
+    #   - Beehiiv: BambooHR (separate adapter)
+    #   - Blueprint: Workable (separate adapter)
+    #   - Kajabi: Greenhouse (slug not found in our attempts)
+    #   - Coinbase, Hims & Hers: Cloudflare-protected, custom careers pages
+    #   - Function Health, Spring Health: custom careers pages
+    #   - Cash App: routes through Block's main careers page
+    #   - Pipe, Rarible, Arrived, Tally Health, InsideTracker, Republic,
+    #     Fourthwall, Pomelo, Stori, Kushki, Sunday Health, Nue Life Health,
+    #     Thrasio, OpenStore, REEF Technology, Square: TBD
 }
