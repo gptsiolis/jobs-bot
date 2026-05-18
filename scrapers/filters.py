@@ -4,6 +4,7 @@ Keeps role/location/company/seniority logic in one place so the four
 scrapers stay thin.
 """
 
+import hashlib
 import re
 
 from config import (
@@ -24,6 +25,16 @@ NON_US_KEYWORDS = [
     "germany", "france", "spain", "italy", "japan",
     "korea", "china", "hong kong", "taiwan",
 ]
+
+
+def stable_job_hash(value):
+    """Deterministic short hash for building cross-run-stable job IDs.
+
+    Python's builtin hash() is per-process randomized (PYTHONHASHSEED), so
+    using it for *persisted* job IDs silently breaks seen-job dedup across
+    runs — the same URL hashes differently every process. This is stable.
+    """
+    return hashlib.sha1((value or "").encode("utf-8")).hexdigest()[:16]
 
 
 def _normalize_company(name):

@@ -89,7 +89,7 @@ def scrape_board(page, board_url, vc_name, role_queries, skip_seniority):
             is_remote = "remote" in location.lower()
 
             matched_jobs.append({
-                "job_id": f"consider-{hash(url)}",
+                "job_id": f"consider-{filters.stable_job_hash(url)}",
                 "job_title": job.get("title", ""),
                 "employer_name": job.get("company", "Unknown"),
                 "job_city": "",

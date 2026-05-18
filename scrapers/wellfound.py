@@ -84,7 +84,7 @@ def scrape(page, role_queries, skip_seniority):
             is_remote = "remote" in location.lower()
 
             matched_jobs.append({
-                "job_id": f"wellfound-{hash(url)}",
+                "job_id": f"wellfound-{filters.stable_job_hash(url)}",
                 "job_title": job.get("title", ""),
                 "employer_name": job.get("company", "Unknown"),
                 "job_city": "",
