@@ -13,12 +13,33 @@ from config import (
     GETRO_BOARDS, CONSIDER_BOARDS, ROLE_QUERIES, SKIP_SENIORITY,
     COMPANY_BOARDS, LOCATION_ALLOW,
 )
-from scrapers import getro, consider, yc, wellfound, greenhouse, lever, ashby, workday
+from scrapers import getro, consider, yc, wellfound, greenhouse, lever, ashby, workday, workable, smartrecruiters
 
 SEEN_JOBS_FILE = "seen_jobs.json"
 SEEN_TTL_DAYS = 60
 
 MODES = ("discovery", "watchlist", "all", "test")
+
+# Titles containing one of these (case-insensitive) get pinned to a
+# priority section at the top of the digest, ahead of the by-source list.
+PRIORITY_TITLE_KEYWORDS = ("operations associate", "operations manager")
+
+
+def _is_priority_job(job):
+    title = (job.get("job_title") or "").lower()
+    return any(kw in title for kw in PRIORITY_TITLE_KEYWORDS)
+
+
+def _render_job(job):
+    title = job.get("job_title", "N/A")
+    company = job.get("employer_name", "N/A")
+    location = _job_location_string(job)
+    link = job.get("job_apply_link", "#")
+    html = f"<p><b>{title}</b> &mdash; {company} &mdash; {location}"
+    if link and link != "#":
+        html += f"<br><a href='{link}'>Apply</a>"
+    html += "</p>"
+    return html
 
 
 def _today_iso():
@@ -129,18 +150,33 @@ def send_email(jobs, heading, subject_prefix):
         loc = _job_location_string(job)
         metro_counts[_categorize_metro(loc)] = metro_counts.get(_categorize_metro(loc), 0) + 1
 
+    priority_jobs = [j for j in jobs if _is_priority_job(j)]
+    rest = [j for j in jobs if not _is_priority_job(j)]
+
     by_source = {}
-    for job in jobs:
+    for job in rest:
         source = job.get("source", "other")
         by_source.setdefault(source, []).append(job)
 
+    total_sources = len({j.get("source", "other") for j in jobs})
+
     body = f"<h2>{heading}</h2>"
-    body += f"<p><b>{len(jobs)} new listings</b> from {len(by_source)} sources</p>"
+    body += f"<p><b>{len(jobs)} new listings</b> from {total_sources} sources</p>"
     breakdown = " &middot; ".join(
         f"{metro}: {count}"
         for metro, count in sorted(metro_counts.items(), key=lambda x: (-x[1], x[0]))
     )
     body += f"<p style='color:#666'>{breakdown}</p><hr>"
+
+    # Priority section — Operations Associate / Manager titles, pinned to top.
+    if priority_jobs:
+        body += f"<h3>⭐ Priority — Operations Associate / Manager ({len(priority_jobs)})</h3>"
+        for job in sorted(
+            priority_jobs,
+            key=lambda j: (j.get("job_title", "").lower(), j.get("employer_name", "").lower()),
+        ):
+            body += _render_job(job)
+        body += "<hr>"
 
     # Sources sorted by job count desc, ties alphabetical
     sources_sorted = sorted(
@@ -152,14 +188,7 @@ def send_email(jobs, heading, subject_prefix):
         body += f"<h3>{source_label} ({len(source_jobs)})</h3>"
         # Sort jobs within a source alphabetically by title
         for job in sorted(source_jobs, key=lambda j: j.get("job_title", "").lower()):
-            title = job.get("job_title", "N/A")
-            company = job.get("employer_name", "N/A")
-            location = _job_location_string(job)
-            link = job.get("job_apply_link", "#")
-            body += f"<p><b>{title}</b> &mdash; {company} &mdash; {location}"
-            if link and link != "#":
-                body += f"<br><a href='{link}'>Apply</a>"
-            body += "</p>"
+            body += _render_job(job)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{subject_prefix} — {len(jobs)} new listings"
@@ -238,6 +267,8 @@ def run_watchlist(seen):
     all_jobs.extend(lever.scrape_all(COMPANY_BOARDS))
     all_jobs.extend(ashby.scrape_all(COMPANY_BOARDS))
     all_jobs.extend(workday.scrape_all(COMPANY_BOARDS))
+    all_jobs.extend(workable.scrape_all(COMPANY_BOARDS))
+    all_jobs.extend(smartrecruiters.scrape_all(COMPANY_BOARDS))
 
     new_jobs = deduplicate(all_jobs, seen)
     print(f"Watchlist total new jobs after dedup: {len(new_jobs)}")
@@ -253,17 +284,22 @@ _ATS_TO_MODULE = {
     "lever": lever,
     "ashby": ashby,
     "workday": workday,
+    "workable": workable,
+    "smartrecruiters": smartrecruiters,
 }
 
 
 def run_test(company_query):
     """Dry-run a single company. Prints matches; sends no email, updates no state."""
     query_norm = company_query.lower().strip()
-    matched_name = None
-    for name in COMPANY_BOARDS:
-        if name.lower() == query_norm or query_norm in name.lower():
-            matched_name = name
-            break
+    # Prefer exact match; fall back to substring
+    matched_name = next(
+        (n for n in COMPANY_BOARDS if n.lower() == query_norm), None,
+    )
+    if not matched_name:
+        matched_name = next(
+            (n for n in COMPANY_BOARDS if query_norm in n.lower()), None,
+        )
 
     if not matched_name:
         print(f"No company in COMPANY_BOARDS matches {company_query!r}.")
@@ -280,8 +316,18 @@ def run_test(company_query):
         sys.exit(1)
 
     print(f"Testing {matched_name} via {ats}...")
-    jobs = module.scrape_company(matched_name, cfg) if ats == "workday" else \
-        module.scrape_company(matched_name, cfg["slug"])
+    if ats == "workday":
+        jobs = module.scrape_company(matched_name, cfg)
+    elif ats == "greenhouse":
+        jobs = module.scrape_company(matched_name, cfg["slug"], cfg.get("bu_filter"))
+    elif ats == "smartrecruiters":
+        jobs = module.scrape_company(
+            matched_name, cfg["slug"],
+            brand_filter=cfg.get("brand_filter"),
+            segment_filter=cfg.get("segment_filter"),
+        )
+    else:
+        jobs = module.scrape_company(matched_name, cfg["slug"])
     print(f"\n{len(jobs)} matching job(s):")
     for j in jobs:
         loc = ", ".join(j.get("locations", [])) or "Unknown"

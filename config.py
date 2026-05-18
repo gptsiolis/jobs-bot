@@ -129,15 +129,14 @@ COMPANY_ALLOWLIST = {
     "media_entertainment": [
         "A24",
         "Agentio",
-        "Beehiiv",
         "Christie's",
+        "Discord",
         "Disney",
         "Disney+",
         "DraftKings",
         "Epic Games",
         "Fanatics",
         "FanDuel",
-        "Fourthwall",
         "Kajabi",
         "NBCUniversal",
         "Peacock",
@@ -160,6 +159,7 @@ COMPANY_ALLOWLIST = {
     "fintech_crypto": [
         "Affirm",
         "Alpaca",
+        "Anchorage",
         "Arrived",
         "Betterment",
         "Block",
@@ -184,12 +184,10 @@ COMPANY_ALLOWLIST = {
         "Novo",
         "OpenSea",
         "Pacaso",
-        "Pipe",
         "Plaid",
         "Pomelo",
         "Public.com",
         "Ramp",
-        "Rarible",
         "Republic",
         "Rho",
         "Robinhood",
@@ -214,16 +212,12 @@ COMPANY_ALLOWLIST = {
         "Modern Health",
         "Neko Health",
         "Nudge",
-        "Nue Life Health",
         "Oura",
         "Papa",
         "Ro",
         "Roman",
-        "Spring Health",
-        "Sunday Health",
         "Superpower",
         "Superpower Health",
-        "Tally Health",
         "Viome",
         "Whoop",
     ],
@@ -234,10 +228,7 @@ COMPANY_ALLOWLIST = {
         "Etsy",
         "Faire",
         "Flow",
-        "OpenStore",
-        "REEF Technology",
         "StockX",
-        "Thrasio",
         "Pattern",
     ],
 }
@@ -284,13 +275,32 @@ COMPANY_BOARDS = {
     "Blockchain.com":   {"ats": "greenhouse", "slug": "blockchain"},
     "Gemini":           {"ats": "greenhouse", "slug": "gemini"},
     "A24":              {"ats": "greenhouse", "slug": "a24"},
-    "Block":            {"ats": "greenhouse", "slug": "block"},
+    "Epic Games":       {"ats": "greenhouse", "slug": "epicgames"},
+    "Sotheby's":        {"ats": "greenhouse", "slug": "sothebys"},
+    "StockX":           {"ats": "greenhouse", "slug": "stockx"},
+    # Block / Cash App / Square all share the same Greenhouse board.
+    # bu_filter narrows each entry to its Business Unit so the digest
+    # attributes jobs correctly.
+    "Block":            {"ats": "greenhouse", "slug": "block", "bu_filter": "Centralized Block"},
+    "Cash App":         {"ats": "greenhouse", "slug": "block", "bu_filter": "Cash"},
+    "Square":           {"ats": "greenhouse", "slug": "block", "bu_filter": "Square"},
 
     # ── Workday ──
     "Warner Bros. Discovery": {"ats": "workday", "tenant": "warnerbros", "wd": "wd5", "site": "global"},
     "Disney":                 {"ats": "workday", "tenant": "disney",     "wd": "wd5", "site": "disneycareer"},
     "Etsy":                   {"ats": "workday", "tenant": "etsy",       "wd": "wd5", "site": "Etsy_Careers"},
     "DraftKings":             {"ats": "workday", "tenant": "draftkings", "wd": "wd1", "site": "DraftKings"},
+    "Christie's":             {"ats": "workday", "tenant": "christies",  "wd": "wd3", "site": "Christies_Careers"},
+
+    # ── Workable ──
+    "Blueprint":              {"ats": "workable", "slug": "blueprint-bryanjohnson"},
+
+    # ── SmartRecruiters ──
+    # NBCUniversal's board (~420 postings) already includes Peacock roles
+    # under Business Segment / Brands; no separate Peacock entry to avoid
+    # double-counting. If we ever want to split, add a second entry with
+    # brand_filter or segment_filter set to "Peacock".
+    "NBCUniversal":           {"ats": "smartrecruiters", "slug": "NBCUniversal3"},
 
     # ── Lever ──
     "Plaid":            {"ats": "lever", "slug": "plaid"},
@@ -326,20 +336,21 @@ COMPANY_BOARDS = {
     "Agentio":          {"ats": "ashby", "slug": "agentio"},
     "Nudge":            {"ats": "ashby", "slug": "nudge"},
     "Superpower":       {"ats": "ashby", "slug": "superpower"},
+    # Note: this Ashby board is Hims & Hers' pharmacy/fulfillment arm only
+    # (compounding/facilities roles in OH & AZ). Their corporate strategy/
+    # ops roles live elsewhere — effectively still uncovered for our digest.
+    "Hims & Hers":      {"ats": "ashby", "slug": "hims-and-hers"},
 
     # ── Not yet covered ──
-    # Either on a Workday tenant we couldn't locate, on a different ATS we
-    # don't have an adapter for, or behind Cloudflare. Add as we build out.
-    #   - Paramount, NBCUniversal, Klarna: Workday tenants exist but our
-    #     payload gets 422 — site name needs investigation
-    #   - eBay: Phenom People (separate adapter)
-    #   - Beehiiv: BambooHR (separate adapter)
-    #   - Blueprint: Workable (separate adapter)
-    #   - Kajabi: Greenhouse (slug not found in our attempts)
-    #   - Coinbase, Hims & Hers: Cloudflare-protected, custom careers pages
-    #   - Function Health, Spring Health: custom careers pages
-    #   - Cash App: routes through Block's main careers page
-    #   - Pipe, Rarible, Arrived, Tally Health, InsideTracker, Republic,
-    #     Fourthwall, Pomelo, Stori, Kushki, Sunday Health, Nue Life Health,
-    #     Thrasio, OpenStore, REEF Technology, Square: TBD
+    # Either on an ATS we don't have an adapter for, or behind Cloudflare.
+    #   - Paramount: SuccessFactors (separate adapter, no clean public API)
+    #   - Klarna: migrating off Workday to Deel (separate adapter)
+    #   - eBay: Phenom People (separate adapter, no clean public endpoint)
+    #   - Coinbase: Cloudflare-protected, custom careers page (no Greenhouse/Lever slug)
+    #   - Kajabi: JS-rendered, ATS not yet identified
+    #   - Function Health: custom careers page (Gem-powered)
+    #   - Circle: PhenomPeople hint, would need Phenom adapter
+    #   - Arrived: Breezy HR (separate adapter)
+    #   - InsideTracker, Republic, Stori, Kushki, Pomelo (fintech): TBD
+    #   - Cash App, Square: route through Block's Greenhouse (already wired via bu_filter)
 }
