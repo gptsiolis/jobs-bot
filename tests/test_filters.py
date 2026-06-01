@@ -26,6 +26,8 @@ class FilterTests(unittest.TestCase):
             "Operations Associate",
             "Business Operations Analyst",
             "Program Coordinator",
+            "Business Development Representative",
+            "Partnerships Associate",
         ]
         for title in titles:
             with self.subTest(title=title):
@@ -92,6 +94,62 @@ class FilterTests(unittest.TestCase):
         )
         metadata = filters.fit_metadata("Operations Associate", senior_description)
         self.assertEqual(metadata["fit_bucket"], "possible")
+
+    def test_broad_operations_without_entry_level_signal_is_rejected(self):
+        self.assertFalse(
+            filters.passes_watchlist(
+                "Product Operations Manager",
+                "Remote",
+                "ExampleCo",
+                "Own cross-functional operational processes.",
+            )
+        )
+        self.assertFalse(
+            filters.passes_watchlist(
+                "Operations Specialist",
+                "Remote",
+                "ExampleCo",
+                "Own cross-functional operational processes.",
+            )
+        )
+
+    def test_warehouse_and_logistics_operations_are_excluded(self):
+        blocked = [
+            ("Warehouse Operations Associate", "New York, NY", ""),
+            ("Operations Coordinator", "Los Angeles, CA", "Support logistics and inventory control."),
+            ("Food Operations Specialist", "Remote", "Manage food operations vendors."),
+        ]
+        for title, location, description in blocked:
+            with self.subTest(title=title):
+                self.assertFalse(
+                    filters.passes_watchlist(title, location, "ExampleCo", description)
+                )
+
+    def test_low_compensation_is_excluded_when_posted(self):
+        low_comp = [
+            "This role pays $25/hour.",
+            "The salary range is $55,000 - $65,000 per year.",
+        ]
+        for description in low_comp:
+            with self.subTest(description=description):
+                self.assertFalse(
+                    filters.passes_watchlist(
+                        "Operations Associate",
+                        "Remote",
+                        "ExampleCo",
+                        description,
+                    )
+                )
+
+    def test_compensation_floor_allows_ranges_that_can_clear_70k(self):
+        self.assertTrue(
+            filters.passes_watchlist(
+                "Business Development Associate",
+                "Remote",
+                "ExampleCo",
+                "The salary range is $65,000 - $80,000 per year.",
+            )
+        )
 
     def test_no_sponsorship_language_is_excluded(self):
         description = "Candidates must be authorized to work without sponsorship now or in the future."

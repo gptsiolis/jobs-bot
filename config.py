@@ -89,6 +89,14 @@ ROLE_TIERS = {
         "strategy & operations associate",
         "strategy and operations associate",
         "strategy operations associate",
+        "business development associate",
+        "business development analyst",
+        "business development representative",
+        "partnerships associate",
+        "partnerships analyst",
+        "partner development associate",
+        "growth associate",
+        "growth analyst",
         "program coordinator",
         "special projects associate",
     ],
@@ -96,6 +104,9 @@ ROLE_TIERS = {
         "chief of staff",
         "operations",
         "business operations",
+        "business development",
+        "partnerships",
+        "growth",
         "strategy",
         "special projects",
     ],
@@ -111,7 +122,7 @@ ROLE_QUERIES = [kw for kws in ROLE_TIERS.values() for kw in kws]
 # request (no Lead-titled roles), alongside the senior/exec bands.
 SKIP_SENIORITY = [
     "senior", "sr.", "staff", "principal", "director",
-    "vp", "vice president", "head of", "lead",
+    "vp", "vice president", "head of", "lead", "manager", "mgr",
 ]
 
 # ── Hard exclusions ─────────────────────────────────────────
@@ -122,7 +133,9 @@ EXCLUDE_KEYWORDS = [
     "engineer", "engineering", "developer", "software",
     "devops", "site reliability", "data scientist",
     "machine learning", "designer", "architect",
-    "scientist", "qa ", "sdet",
+    "scientist", "qa ", "sdet", "warehouse", "fulfillment",
+    "logistics", "supply chain", "inventory", "distribution",
+    "fleet", "driver", "facilities", "manufacturing",
 ]
 
 # Full-time search only. These title terms are excluded even if a posting

@@ -12,6 +12,14 @@ from collections import Counter
 import requests
 
 JOB_STATUSES = ("new", "saved", "applied", "dismissed", "archived")
+WATCHLIST_SOURCE_PREFIXES = (
+    "greenhouse:",
+    "lever:",
+    "ashby:",
+    "workday:",
+    "workable:",
+    "smartrecruiters:",
+)
 
 FIT_SCORE = {
     "strong": 50,
@@ -84,6 +92,10 @@ def calculate_applicability_score(job):
 
     if "new grad" in reasons or "entry-level" in reasons or "0-1 years" in reasons:
         score += 8
+    if any(word in title for word in ("associate", "analyst", "coordinator", "new grad")):
+        score += 10
+    if any(word in title for word in ("business development", "partnership", "growth")):
+        score += 8
     if "remote" in location:
         score += 4
     if any(city in location for city in ("new york", "los angeles", "san francisco", "miami")):
@@ -94,6 +106,13 @@ def calculate_applicability_score(job):
         score -= 12
     if "contract" in title or "contract" in description[:1500]:
         score -= 15
+    if any(word in title for word in ("manager", "director", "lead", "head of")):
+        score -= 25
+    if any(
+        word in f"{title} {description[:1500]}"
+        for word in ("warehouse", "logistics", "supply chain", "inventory", "fleet")
+    ):
+        score -= 35
     if sponsor_tier == "unknown_no_ban":
         score -= 3
 
@@ -275,3 +294,15 @@ class SupabaseJobStore:
             "total_new": sum(1 for row in data or [] if row.get("inserted")),
             "dry_run": False,
         }
+
+    def archive_unmatched_new_jobs(self, current_job_ids, source_prefixes=None):
+        data = self._request(
+            "POST",
+            "/rest/v1/rpc/archive_unmatched_new_jobs",
+            json={
+                "current_job_ids": list(current_job_ids),
+                "source_prefixes": list(source_prefixes or WATCHLIST_SOURCE_PREFIXES),
+            },
+            timeout=120,
+        )
+        return int(data or 0)

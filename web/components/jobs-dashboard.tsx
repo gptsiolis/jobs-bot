@@ -23,6 +23,15 @@ const statusLabels: Record<JobStatus, string> = {
   archived: "Archived"
 };
 
+const phaseTabs = [
+  { value: "active", label: "All jobs" },
+  { value: "new", label: "New" },
+  { value: "saved", label: "Saved" },
+  { value: "applied", label: "Applied" },
+  { value: "dismissed", label: "Dismissed" },
+  { value: "archived", label: "Archived" }
+];
+
 function unique(values: string[]) {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
@@ -135,6 +144,28 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
         </div>
       </section>
 
+      <nav className="phase-tabs" aria-label="Job phases">
+        {phaseTabs.map((tab) => {
+          const count = jobs.filter((job) => {
+            if (tab.value === "active") {
+              return job.status === "new" || job.status === "saved";
+            }
+            return job.status === tab.value;
+          }).length;
+          return (
+            <button
+              key={tab.value}
+              className={status === tab.value ? "phase-tab is-active" : "phase-tab"}
+              type="button"
+              onClick={() => setStatus(tab.value)}
+            >
+              <span>{tab.label}</span>
+              <strong>{count}</strong>
+            </button>
+          );
+        })}
+      </nav>
+
       <section className="filters">
         <label>
           <span className="muted">Search</span>
@@ -143,18 +174,6 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Title, company, source"
           />
-        </label>
-        <label>
-          <span className="muted">Status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="active">Active</option>
-            <option value="">All</option>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
         </label>
         <label>
           <span className="muted">Fit</span>

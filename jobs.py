@@ -367,6 +367,7 @@ def run_sync(mode, dry_run=False):
     run_id = None
     jobs = []
     result = {"total_written": 0, "total_new": 0}
+    archived_stale = 0
     try:
         if store:
             run_id = store.create_run(mode)
@@ -382,6 +383,10 @@ def run_sync(mode, dry_run=False):
             }
         else:
             result = store.upsert_jobs(jobs)
+            if mode == "watchlist":
+                archived_stale = store.archive_unmatched_new_jobs(
+                    [job["job_id"] for job in jobs if job.get("job_id")]
+                )
         if store:
             store.finish_run(
                 run_id,
@@ -397,6 +402,8 @@ def run_sync(mode, dry_run=False):
             f"\n[Sync{suffix}] {len(jobs)} matched; "
             f"{result['total_written']} written; {result['total_new']} new."
         )
+        if archived_stale:
+            print(f"[Sync] Archived {archived_stale} unmatched new watchlist jobs.")
     except Exception as exc:
         if store and run_id:
             store.finish_run(

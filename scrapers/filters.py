@@ -17,6 +17,9 @@ from config import (
     INTERNSHIP_KEYWORDS,
 )
 
+MIN_ANNUAL_SALARY = 70000
+MIN_HOURLY_RATE = MIN_ANNUAL_SALARY / 2080
+
 NON_US_KEYWORDS = [
     "europe", "emea", "apac", "latam", "asia", "apj",
     "dach", "nordics", "benelux", "mena", "anz",
@@ -149,6 +152,33 @@ SPONSOR_POSITIVE_TEXT = [
     "we sponsor",
 ]
 
+LOGISTICS_OPERATIONS_TEXT = [
+    "warehouse",
+    "fulfillment center",
+    "distribution center",
+    "logistics",
+    "supply chain",
+    "inventory control",
+    "fleet operations",
+    "delivery operations",
+    "driver operations",
+    "facilities operations",
+    "manufacturing operations",
+    "production operations",
+    "food operations",
+]
+
+ENTRY_LEVEL_TITLE_TEXT = [
+    "associate",
+    "analyst",
+    "coordinator",
+    "new grad",
+    "entry level",
+    "entry-level",
+    "early career",
+    "representative",
+]
+
 
 def is_excluded_seniority(title):
     t = (title or "").lower()
@@ -205,11 +235,64 @@ def is_excluded_keyword(title):
     return any(kw in t for kw in EXCLUDE_KEYWORDS)
 
 
+def is_logistics_operations(title, description=""):
+    blob = f"{title or ''} {description or ''}".lower()
+    return any(phrase in blob for phrase in LOGISTICS_OPERATIONS_TEXT)
+
+
 def _normalize_text(text):
     text = re.sub(r"<[^>]+>", " ", text or "")
     text = re.sub(r"&nbsp;|&#160;", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def _money_to_number(raw, suffix=""):
+    value = float((raw or "0").replace(",", ""))
+    if suffix and suffix.lower() == "k":
+        value *= 1000
+    return value
+
+
+def _range_max(first, first_suffix, second, second_suffix):
+    first_value = _money_to_number(first, first_suffix)
+    if not second:
+        return first_value
+    return max(first_value, _money_to_number(second, second_suffix or first_suffix))
+
+
+def compensation_below_floor(text):
+    """True when the posting explicitly advertises comp below our floor.
+
+    Missing compensation is not a rejection signal. Low hourly/annual posted
+    comp is.
+    """
+    normalized = _normalize_text(text).lower()
+    hourly_pattern = re.compile(
+        r"\$?\s*(\d{1,3}(?:\.\d{1,2})?)\s*(?:-|to|–|—)?\s*"
+        r"\$?\s*(\d{1,3}(?:\.\d{1,2})?)?\s*"
+        r"(?:/ ?hour|/hr|per hour|hourly|an hour|hr\b)"
+    )
+    hourly_maxes = [
+        _range_max(match.group(1), "", match.group(2), "")
+        for match in hourly_pattern.finditer(normalized)
+    ]
+    if hourly_maxes and max(hourly_maxes) < MIN_HOURLY_RATE:
+        return True
+
+    annual_pattern = re.compile(
+        r"\$?\s*(\d{2,3}(?:,\d{3})+|\d{2,3})\s*(k)?\s*"
+        r"(?:-|to|–|—)?\s*\$?\s*"
+        r"(\d{2,3}(?:,\d{3})+|\d{2,3})?\s*(k)?\s*"
+        r"(?:per year|annually|annual|base salary|salary|/year|/yr)"
+    )
+    annual_maxes = [
+        _range_max(match.group(1), match.group(2), match.group(3), match.group(4))
+        for match in annual_pattern.finditer(normalized)
+    ]
+    if annual_maxes and max(annual_maxes) < MIN_ANNUAL_SALARY:
+        return True
+    return False
 
 
 def _has_positive_experience(text):
@@ -253,6 +336,7 @@ def fit_metadata(title, description=""):
     text = _normalize_text(description)
     positive_desc = _has_positive_experience(text)
     negative_desc = _has_negative_experience(text)
+    entry_level_title = any(phrase in (title or "").lower() for phrase in ENTRY_LEVEL_TITLE_TEXT)
 
     reasons = []
     if tier == 1:
@@ -266,8 +350,30 @@ def fit_metadata(title, description=""):
         reasons.append("0-1 years mentioned")
     if negative_desc:
         reasons.append("2+ years mentioned")
+    if compensation_below_floor(text):
+        reasons.append("compensation below floor")
+
+    if is_logistics_operations(title, text):
+        return {
+            "fit_bucket": "reject",
+            "fit_reasons": reasons + ["warehouse/logistics operations"],
+            "job_description": text,
+        }
+    if compensation_below_floor(text):
+        return {
+            "fit_bucket": "reject",
+            "fit_reasons": reasons,
+            "job_description": text,
+        }
 
     early_title = tier in (1, 2)
+    broad_title = tier == 3
+    if broad_title and not positive_desc and not entry_level_title:
+        return {
+            "fit_bucket": "reject",
+            "fit_reasons": reasons + ["broad title without entry-level signal"],
+            "job_description": text,
+        }
     if negative_desc and not early_title and not positive_desc:
         return {
             "fit_bucket": "reject",
@@ -329,6 +435,10 @@ def passes_discovery(title, location_blob, employer_name, description=""):
         return False
     if is_excluded_keyword(title):
         return False
+    if is_logistics_operations(title, description):
+        return False
+    if compensation_below_floor(description):
+        return False
     if is_internship(title):
         return False
     if is_excluded_seniority(title):
@@ -352,6 +462,10 @@ def passes_watchlist(title, location_blob, employer_name, description=""):
     if not is_role_match(title):
         return False
     if is_excluded_keyword(title):
+        return False
+    if is_logistics_operations(title, description):
+        return False
+    if compensation_below_floor(description):
         return False
     if is_internship(title):
         return False

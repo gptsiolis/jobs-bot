@@ -183,6 +183,36 @@ $$;
 revoke all on function public.upsert_jobs(jsonb) from public, anon, authenticated;
 grant execute on function public.upsert_jobs(jsonb) to service_role;
 
+create or replace function public.archive_unmatched_new_jobs(
+  current_job_ids jsonb,
+  source_prefixes text[]
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  archived_count integer;
+begin
+  update public.jobs j
+  set status = 'archived'
+  where j.status = 'new'
+    and not (j.job_id in (select jsonb_array_elements_text(current_job_ids)))
+    and exists (
+      select 1
+      from unnest(source_prefixes) as prefix
+      where j.source like prefix || '%'
+    );
+
+  get diagnostics archived_count = row_count;
+  return archived_count;
+end;
+$$;
+
+revoke all on function public.archive_unmatched_new_jobs(jsonb, text[]) from public, anon, authenticated;
+grant execute on function public.archive_unmatched_new_jobs(jsonb, text[]) to service_role;
+
 alter table public.jobs enable row level security;
 alter table public.job_runs enable row level security;
 alter table public.job_events enable row level security;
