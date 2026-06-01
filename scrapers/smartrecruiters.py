@@ -76,6 +76,15 @@ def _normalize_job(posting, company_name, slug):
     loc = posting.get("location") or {}
     location_str = _format_location(loc)
     is_remote = bool(loc.get("remote"))
+    job_ad = posting.get("jobAd") or {}
+    description = " ".join(
+        p for p in [
+            job_ad.get("sections", {}).get("jobDescription", "")
+            if isinstance(job_ad.get("sections"), dict) else "",
+            job_ad.get("sections", {}).get("qualifications", "")
+            if isinstance(job_ad.get("sections"), dict) else "",
+        ] if p
+    )
     return {
         "job_id": f"smartrecruiters-{posting.get('id', '')}",
         "job_title": posting.get("name", ""),
@@ -88,6 +97,7 @@ def _normalize_job(posting, company_name, slug):
         "locations": [location_str] if location_str else [],
         "work_mode": "remote" if is_remote else "",
         "source": f"smartrecruiters:{company_name}",
+        "job_description": description,
     }
 
 
@@ -110,10 +120,13 @@ def scrape_company(company_name, slug, brand_filter=None, segment_filter=None):
             continue
         normalized = _normalize_job(posting, company_name, slug)
         location_blob = " ".join(normalized["locations"])
+        description = normalized.get("job_description", "")
         if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"]
+            normalized["job_title"], location_blob, normalized["employer_name"],
+            description,
         ):
             continue
+        filters.add_fit_metadata(normalized, description)
         matched.append(normalized)
     return matched
 

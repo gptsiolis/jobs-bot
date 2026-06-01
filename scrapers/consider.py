@@ -88,7 +88,7 @@ def scrape_board(page, board_url, vc_name, role_queries, skip_seniority):
                 continue
             is_remote = "remote" in location.lower()
 
-            matched_jobs.append({
+            normalized = {
                 "job_id": f"consider-{filters.stable_job_hash(url)}",
                 "job_title": job.get("title", ""),
                 "employer_name": job.get("company", "Unknown"),
@@ -100,7 +100,10 @@ def scrape_board(page, board_url, vc_name, role_queries, skip_seniority):
                 "locations": [location] if location else [],
                 "work_mode": "remote" if is_remote else "on_site",
                 "source": f"consider:{vc_name}",
-            })
+                "job_description": "",
+            }
+            filters.add_fit_metadata(normalized)
+            matched_jobs.append(normalized)
 
     return matched_jobs
 

@@ -23,10 +23,10 @@ _FETCH_CACHE = {}
 
 
 def _fetch(slug, need_metadata=False):
-    cache_key = (slug, need_metadata)
+    cache_key = slug
     if cache_key in _FETCH_CACHE:
         return _FETCH_CACHE[cache_key]
-    url = (API_WITH_META if need_metadata else API).format(slug=slug)
+    url = API_WITH_META.format(slug=slug)
     try:
         resp = requests.get(url, headers=HEADERS, timeout=20)
     except requests.RequestException as e:
@@ -72,6 +72,7 @@ def _normalize_job(job, company_name):
         "locations": [location] if location else [],
         "work_mode": "remote" if "remote" in location.lower() else "",
         "source": f"greenhouse:{company_name}",
+        "job_description": job.get("content", "") or "",
     }
 
 
@@ -92,10 +93,13 @@ def scrape_company(company_name, slug, bu_filter=None):
             continue
         normalized = _normalize_job(job, company_name)
         location_blob = " ".join(normalized["locations"])
+        description = normalized.get("job_description", "")
         if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"]
+            normalized["job_title"], location_blob, normalized["employer_name"],
+            description,
         ):
             continue
+        filters.add_fit_metadata(normalized, description)
         matched.append(normalized)
     return matched
 

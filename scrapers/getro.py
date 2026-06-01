@@ -54,6 +54,7 @@ def _normalize_job(job, vc_name):
         "locations": locations,
         "work_mode": work_mode,
         "source": f"getro:{vc_name}",
+        "job_description": job.get("description", "") or "",
     }
 
 
@@ -96,11 +97,14 @@ def scrape_board(board_url, vc_name, role_queries, skip_seniority):
 
             normalized = _normalize_job(job, vc_name)
             location_blob = " ".join(normalized["locations"])
+            description = normalized.get("job_description", "")
             if not filters.passes_discovery(
-                normalized["job_title"], location_blob, normalized["employer_name"]
+                normalized["job_title"], location_blob, normalized["employer_name"],
+                description,
             ):
                 continue
 
+            filters.add_fit_metadata(normalized, description)
             matched_jobs.append(normalized)
 
     return matched_jobs

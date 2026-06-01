@@ -85,7 +85,7 @@ def scrape(page, role_queries, skip_seniority):
 
             is_remote = "remote" in location.lower()
 
-            matched_jobs.append({
+            normalized = {
                 "job_id": f"yc-{filters.stable_job_hash(url)}",
                 "job_title": job.get("title", ""),
                 "employer_name": job.get("company", "Unknown"),
@@ -97,6 +97,9 @@ def scrape(page, role_queries, skip_seniority):
                 "locations": [location] if location else [],
                 "work_mode": "remote" if is_remote else "on_site",
                 "source": "Y Combinator",
-            })
+                "job_description": "",
+            }
+            filters.add_fit_metadata(normalized)
+            matched_jobs.append(normalized)
 
     return matched_jobs

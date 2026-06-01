@@ -13,21 +13,22 @@ from config import (
     GETRO_BOARDS, CONSIDER_BOARDS, ROLE_QUERIES, SKIP_SENIORITY,
     COMPANY_BOARDS, LOCATION_ALLOW,
 )
+from company_registry import (
+    QUALITY_RANK,
+    SPONSOR_RANK,
+    metadata_for_company,
+    sponsor_label,
+)
 from scrapers import getro, consider, yc, wellfound, greenhouse, lever, ashby, workday, workable, smartrecruiters
+from scrapers.filters import FIT_BUCKET_LABELS, add_fit_metadata
+from storage import SupabaseJobStore, counts_by_source, normalize_job_record
 
 SEEN_JOBS_FILE = "seen_jobs.json"
 SEEN_TTL_DAYS = 60
 
-MODES = ("discovery", "watchlist", "all", "test")
+MODES = ("discovery", "watchlist", "all", "test", "sync")
 
-# Titles containing one of these (case-insensitive) get pinned to a
-# priority section at the top of the digest, ahead of the by-source list.
-PRIORITY_TITLE_KEYWORDS = ("operations associate", "operations manager")
-
-
-def _is_priority_job(job):
-    title = (job.get("job_title") or "").lower()
-    return any(kw in title for kw in PRIORITY_TITLE_KEYWORDS)
+FIT_BUCKET_ORDER = ("strong", "possible", "unknown")
 
 
 def _render_job(job):
@@ -35,11 +36,36 @@ def _render_job(job):
     company = job.get("employer_name", "N/A")
     location = _job_location_string(job)
     link = job.get("job_apply_link", "#")
+    reasons = job.get("fit_reasons") or []
+    sponsor = sponsor_label(job.get("sponsor_tier"))
+    quality = (job.get("quality_tier") or "acceptable").replace("_", " ")
     html = f"<p><b>{title}</b> &mdash; {company} &mdash; {location}"
+    html += f"<br><span style='color:#666'>Sponsor: {sponsor} &middot; Company: {quality}</span>"
+    if reasons:
+        html += f"<br><span style='color:#666'>Fit: {', '.join(reasons)}</span>"
+    sponsor_reasons = job.get("sponsor_reasons") or []
+    if sponsor_reasons:
+        html += f"<br><span style='color:#666'>Work auth: {', '.join(sponsor_reasons)}</span>"
     if link and link != "#":
         html += f"<br><a href='{link}'>Apply</a>"
     html += "</p>"
     return html
+
+
+def _enrich_company_metadata(job):
+    metadata = metadata_for_company(job.get("employer_name", ""))
+    for key, value in metadata.items():
+        job.setdefault(key, value)
+    return job
+
+
+def _job_sort_key(job):
+    return (
+        SPONSOR_RANK.get(job.get("sponsor_tier"), 99),
+        QUALITY_RANK.get(job.get("quality_tier"), 99),
+        job.get("employer_name", "").lower(),
+        job.get("job_title", "").lower(),
+    )
 
 
 def _today_iso():
@@ -143,6 +169,10 @@ def send_email(jobs, heading, subject_prefix):
     if not jobs:
         print(f"\n[{heading}] No new jobs found.")
         return
+    if not (SENDER_EMAIL and SENDER_PASSWORD and RECIPIENT_EMAIL):
+        raise RuntimeError(
+            "Email mode requires SENDER_EMAIL, SENDER_PASSWORD, and RECIPIENT_EMAIL."
+        )
 
     # Metro breakdown for the email header
     metro_counts = {}
@@ -150,13 +180,12 @@ def send_email(jobs, heading, subject_prefix):
         loc = _job_location_string(job)
         metro_counts[_categorize_metro(loc)] = metro_counts.get(_categorize_metro(loc), 0) + 1
 
-    priority_jobs = [j for j in jobs if _is_priority_job(j)]
-    rest = [j for j in jobs if not _is_priority_job(j)]
-
-    by_source = {}
-    for job in rest:
-        source = job.get("source", "other")
-        by_source.setdefault(source, []).append(job)
+    by_bucket = {}
+    for job in jobs:
+        _enrich_company_metadata(job)
+        if not job.get("fit_bucket"):
+            add_fit_metadata(job)
+        by_bucket.setdefault(job.get("fit_bucket", "unknown"), []).append(job)
 
     total_sources = len({j.get("source", "other") for j in jobs})
 
@@ -168,27 +197,29 @@ def send_email(jobs, heading, subject_prefix):
     )
     body += f"<p style='color:#666'>{breakdown}</p><hr>"
 
-    # Priority section — Operations Associate / Manager titles, pinned to top.
-    if priority_jobs:
-        body += f"<h3>⭐ Priority — Operations Associate / Manager ({len(priority_jobs)})</h3>"
-        for job in sorted(
-            priority_jobs,
-            key=lambda j: (j.get("job_title", "").lower(), j.get("employer_name", "").lower()),
-        ):
-            body += _render_job(job)
-        body += "<hr>"
+    # Sections in fit order, each sub-grouped by source.
+    for bucket in FIT_BUCKET_ORDER:
+        bucket_jobs = by_bucket.get(bucket, [])
+        if not bucket_jobs:
+            continue
+        label = FIT_BUCKET_LABELS.get(bucket, bucket.title())
+        body += f"<h3>{label} ({len(bucket_jobs)})</h3>"
 
-    # Sources sorted by job count desc, ties alphabetical
-    sources_sorted = sorted(
-        by_source.items(),
-        key=lambda x: (-len(x[1]), x[0]),
-    )
-    for source, source_jobs in sources_sorted:
-        source_label = _format_source_label(source)
-        body += f"<h3>{source_label} ({len(source_jobs)})</h3>"
-        # Sort jobs within a source alphabetically by title
-        for job in sorted(source_jobs, key=lambda j: j.get("job_title", "").lower()):
-            body += _render_job(job)
+        by_source = {}
+        for job in bucket_jobs:
+            by_source.setdefault(job.get("source", "other"), []).append(job)
+
+        # Sources sorted by best sponsor/company quality, then job count.
+        sources_sorted = sorted(
+            by_source.items(),
+            key=lambda x: (min(_job_sort_key(j) for j in x[1]), -len(x[1]), x[0]),
+        )
+        for source, source_jobs in sources_sorted:
+            source_label = _format_source_label(source)
+            body += f"<h4>{source_label} ({len(source_jobs)})</h4>"
+            for job in sorted(source_jobs, key=_job_sort_key):
+                body += _render_job(job)
+        body += "<hr>"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{subject_prefix} — {len(jobs)} new listings"
@@ -202,7 +233,15 @@ def send_email(jobs, heading, subject_prefix):
     print(f"\n[{heading}] Email sent with {len(jobs)} jobs.")
 
 
-def run_discovery(seen):
+def _prepare_jobs(jobs):
+    for job in jobs:
+        _enrich_company_metadata(job)
+        if not job.get("fit_bucket"):
+            add_fit_metadata(job)
+    return jobs
+
+
+def collect_discovery_jobs():
     """Mode A — broad sweep across VC portfolio boards + YC + Wellfound.
 
     Filters: role queries (search-side), seniority + location + non-US (our
@@ -244,6 +283,11 @@ def run_discovery(seen):
         browser.close()
     print("Browser closed.\n")
 
+    return _prepare_jobs(all_jobs)
+
+
+def run_discovery(seen):
+    all_jobs = collect_discovery_jobs()
     new_jobs = deduplicate(all_jobs, seen)
     print(f"Discovery total new jobs after dedup: {len(new_jobs)}")
     send_email(
@@ -253,7 +297,7 @@ def run_discovery(seen):
     )
 
 
-def run_watchlist(seen):
+def collect_watchlist_jobs():
     """Mode B — per-company ATS scrapers for the curated allowlist.
 
     Hits each allowlisted company's own Greenhouse/Lever/Ashby board directly
@@ -270,6 +314,11 @@ def run_watchlist(seen):
     all_jobs.extend(workable.scrape_all(COMPANY_BOARDS))
     all_jobs.extend(smartrecruiters.scrape_all(COMPANY_BOARDS))
 
+    return _prepare_jobs(all_jobs)
+
+
+def run_watchlist(seen):
+    all_jobs = collect_watchlist_jobs()
     new_jobs = deduplicate(all_jobs, seen)
     print(f"Watchlist total new jobs after dedup: {len(new_jobs)}")
     send_email(
@@ -287,6 +336,80 @@ _ATS_TO_MODULE = {
     "workable": workable,
     "smartrecruiters": smartrecruiters,
 }
+
+
+def _scraper_failures():
+    failures = []
+    if hasattr(ashby, "get_failures"):
+        failures.extend(ashby.get_failures())
+    return failures
+
+
+def collect_jobs_for_mode(mode):
+    if mode == "watchlist":
+        return collect_watchlist_jobs()
+    if mode == "discovery":
+        return collect_discovery_jobs()
+    if mode == "all":
+        jobs = []
+        jobs.extend(collect_discovery_jobs())
+        jobs.extend(collect_watchlist_jobs())
+        return jobs
+    raise ValueError(f"Unknown sync mode: {mode!r}")
+
+
+def run_sync(mode, dry_run=False):
+    if mode not in ("watchlist", "discovery", "all"):
+        print("Usage: python jobs.py sync [watchlist|discovery|all] [--dry-run]")
+        sys.exit(2)
+
+    store = None if dry_run else SupabaseJobStore()
+    run_id = None
+    jobs = []
+    result = {"total_written": 0, "total_new": 0}
+    try:
+        if store:
+            run_id = store.create_run(mode)
+        jobs = collect_jobs_for_mode(mode)
+        source_counts = counts_by_source(jobs)
+        if dry_run:
+            normalized = [normalize_job_record(job) for job in jobs if job.get("job_id")]
+            result = {
+                "total_written": len(normalized),
+                "total_new": 0,
+                "records": normalized,
+                "dry_run": True,
+            }
+        else:
+            result = store.upsert_jobs(jobs)
+        if store:
+            store.finish_run(
+                run_id,
+                "success",
+                total_found=len(jobs),
+                total_written=result["total_written"],
+                total_new=result["total_new"],
+                counts=source_counts,
+                failures=_scraper_failures(),
+            )
+        suffix = " (dry run)" if dry_run else ""
+        print(
+            f"\n[Sync{suffix}] {len(jobs)} matched; "
+            f"{result['total_written']} written; {result['total_new']} new."
+        )
+    except Exception as exc:
+        if store and run_id:
+            store.finish_run(
+                run_id,
+                "failed",
+                total_found=len(jobs),
+                total_written=result.get("total_written", 0),
+                total_new=result.get("total_new", 0),
+                counts=counts_by_source(jobs),
+                failures=_scraper_failures(),
+                error=str(exc),
+            )
+        raise
 
 
 def run_test(company_query):
@@ -330,8 +453,16 @@ def run_test(company_query):
         jobs = module.scrape_company(matched_name, cfg["slug"])
     print(f"\n{len(jobs)} matching job(s):")
     for j in jobs:
+        _enrich_company_metadata(j)
         loc = ", ".join(j.get("locations", [])) or "Unknown"
         print(f"  - {j['job_title']}  ({loc})")
+        print(
+            f"    Sponsor: {sponsor_label(j.get('sponsor_tier'))}; "
+            f"Company: {j.get('quality_tier', 'acceptable')}"
+        )
+        reasons = ", ".join(j.get("fit_reasons") or [])
+        if reasons:
+            print(f"    Fit: {j.get('fit_bucket', 'unknown')} - {reasons}")
         if j.get("job_apply_link"):
             print(f"    {j['job_apply_link']}")
 
@@ -341,6 +472,12 @@ def main():
     if mode not in MODES:
         print(f"Unknown mode: {mode!r}. Expected one of {MODES}.")
         sys.exit(2)
+
+    if mode == "sync":
+        sync_mode = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else "watchlist"
+        dry_run = "--dry-run" in sys.argv
+        run_sync(sync_mode, dry_run=dry_run)
+        return
 
     if mode == "test":
         if len(sys.argv) < 3:

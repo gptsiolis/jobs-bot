@@ -85,6 +85,7 @@ def _normalize_job(job, company_name, tenant, wd, site):
         "locations": [location] if location else [],
         "work_mode": "remote" if is_remote else "",
         "source": f"workday:{company_name}",
+        "job_description": job.get("description", "") or "",
     }
 
 
@@ -104,10 +105,13 @@ def scrape_company(company_name, cfg):
                 job, company_name, cfg["tenant"], cfg["wd"], cfg["site"],
             )
             location_blob = " ".join(normalized["locations"])
+            description = normalized.get("job_description", "")
             if not filters.passes_watchlist(
-                normalized["job_title"], location_blob, normalized["employer_name"]
+                normalized["job_title"], location_blob, normalized["employer_name"],
+                description,
             ):
                 continue
+            filters.add_fit_metadata(normalized, description)
             matched.append(normalized)
     return matched
 

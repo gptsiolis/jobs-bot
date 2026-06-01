@@ -1,0 +1,57 @@
+name: Scrape jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Scraper mode"
+        required: true
+        default: "watchlist"
+        type: choice
+        options:
+          - watchlist
+          - discovery
+          - all
+  schedule:
+    - cron: "20 13 * * *"
+    - cron: "40 14 * * 1"
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+      SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+      RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Pick scheduled mode
+        id: mode
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "40 14 * * 1" ]; then
+            echo "mode=discovery" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=watchlist" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run scraper sync
+        run: python jobs.py sync "${{ steps.mode.outputs.mode }}"

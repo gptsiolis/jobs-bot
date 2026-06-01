@@ -2,5 +2,9 @@ seen_jobs.json*
 __pycache__/
 *.pyc
 .env
+web/.env.local
 .claude/
 logs/
+web/node_modules/
+web/.next/
+web/*.log

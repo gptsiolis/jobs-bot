@@ -34,6 +34,18 @@ def _fetch(slug):
     return data
 
 
+def _job_description(job):
+    parts = [
+        job.get("description", ""),
+        job.get("descriptionPlain", ""),
+        job.get("additionalPlain", ""),
+    ]
+    for section in job.get("lists") or []:
+        parts.append(section.get("text", ""))
+        parts.append(section.get("content", ""))
+    return " ".join(p for p in parts if p)
+
+
 def _normalize_job(job, company_name):
     cats = job.get("categories") or {}
     location = cats.get("location") or ""
@@ -52,6 +64,7 @@ def _normalize_job(job, company_name):
         "locations": [location] if location else [],
         "work_mode": "remote" if is_remote else "",
         "source": f"lever:{company_name}",
+        "job_description": _job_description(job),
     }
 
 
@@ -63,10 +76,13 @@ def scrape_company(company_name, slug):
     for job in raw_jobs:
         normalized = _normalize_job(job, company_name)
         location_blob = " ".join(normalized["locations"])
+        description = normalized.get("job_description", "")
         if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"]
+            normalized["job_title"], location_blob, normalized["employer_name"],
+            description,
         ):
             continue
+        filters.add_fit_metadata(normalized, description)
         matched.append(normalized)
     return matched
 

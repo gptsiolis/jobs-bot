@@ -1,0 +1,53 @@
+import { redirect } from "next/navigation";
+import { signOut } from "./actions";
+import { JobsDashboard } from "@/components/jobs-dashboard";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { JobRow, JobRun } from "@/lib/types";
+
+export default async function HomePage() {
+  const supabase = await createSupabaseServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+
+  if (!auth.user) {
+    redirect("/login");
+  }
+
+  const [{ data: jobs, error: jobsError }, { data: runs }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select(
+        "job_id,title,company,location_text,apply_url,source,ats,first_seen_at,last_seen_at,fit_bucket,fit_reasons,sponsor_tier,sponsor_reasons,quality_tier,sector,applicability_score,status,description_excerpt"
+      )
+      .order("applicability_score", { ascending: false })
+      .order("last_seen_at", { ascending: false })
+      .limit(1000),
+    supabase
+      .from("job_runs")
+      .select("id,mode,status,started_at,finished_at,total_found,total_written,total_new,failures")
+      .order("started_at", { ascending: false })
+      .limit(5)
+  ]);
+
+  if (jobsError) {
+    throw new Error(jobsError.message);
+  }
+
+  return (
+    <div className="page">
+      <header className="topbar">
+        <div className="brand">
+          <h1>Jobs Bot</h1>
+          <span>{auth.user.email}</span>
+        </div>
+        <form action={signOut}>
+          <button className="text-button" type="submit">
+            Sign out
+          </button>
+        </form>
+      </header>
+      <main className="main">
+        <JobsDashboard jobs={(jobs || []) as JobRow[]} runs={(runs || []) as JobRun[]} />
+      </main>
+    </div>
+  );
+}

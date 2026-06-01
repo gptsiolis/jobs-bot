@@ -53,6 +53,7 @@ def _normalize_job(job, company_name):
         "locations": [loc_str] if loc_str else [],
         "work_mode": "remote" if is_remote else "",
         "source": f"workable:{company_name}",
+        "job_description": job.get("description", "") or "",
     }
 
 
@@ -64,10 +65,13 @@ def scrape_company(company_name, slug):
     for job in raw:
         normalized = _normalize_job(job, company_name)
         location_blob = " ".join(normalized["locations"])
+        description = normalized.get("job_description", "")
         if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"]
+            normalized["job_title"], location_blob, normalized["employer_name"],
+            description,
         ):
             continue
+        filters.add_fit_metadata(normalized, description)
         matched.append(normalized)
     return matched
 

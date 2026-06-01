@@ -1,0 +1,277 @@
+"""Supabase storage for scraped jobs.
+
+Uses Supabase's REST and RPC endpoints instead of adding a heavy client
+dependency. Scheduled runs should use a service-role key.
+"""
+
+import datetime as _dt
+import os
+import re
+from collections import Counter
+
+import requests
+
+JOB_STATUSES = ("new", "saved", "applied", "dismissed", "archived")
+
+FIT_SCORE = {
+    "strong": 50,
+    "possible": 35,
+    "unknown": 15,
+    "reject": -100,
+}
+SPONSOR_SCORE = {
+    "strong_history": 25,
+    "some_history": 15,
+    "unknown_no_ban": 5,
+    "explicit_no": -40,
+}
+QUALITY_SCORE = {
+    "excellent": 15,
+    "strong": 10,
+    "acceptable": 3,
+}
+
+
+def utc_now_iso():
+    return _dt.datetime.now(_dt.timezone.utc).isoformat()
+
+
+def clean_text(value):
+    text = re.sub(r"<[^>]+>", " ", value or "")
+    text = re.sub(r"&nbsp;|&#160;", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def job_location_string(job):
+    locations = job.get("locations", [])
+    city = job.get("job_city", "")
+    state = job.get("job_state", "")
+    if locations:
+        location = ", ".join(locations)
+    elif city or state:
+        location = ", ".join(p for p in [city, state] if p)
+    else:
+        location = "Unknown"
+    if job.get("job_is_remote") or job.get("work_mode") == "remote":
+        return f"{location} (Remote)" if location != "Unknown" else "Remote"
+    return location
+
+
+def ats_from_source(source):
+    source = source or ""
+    if ":" in source:
+        return source.split(":", 1)[0]
+    if source in {"Y Combinator", "Wellfound"}:
+        return source.lower().replace(" ", "_")
+    return source.lower() or "unknown"
+
+
+def calculate_applicability_score(job):
+    """Score jobs on a 0-100 scale using the current fit/company metadata."""
+    score = 0
+    fit_bucket = job.get("fit_bucket") or "unknown"
+    sponsor_tier = job.get("sponsor_tier") or "unknown_no_ban"
+    quality_tier = job.get("quality_tier") or "acceptable"
+    reasons = " ".join(job.get("fit_reasons") or []).lower()
+    title = (job.get("job_title") or "").lower()
+    description = clean_text(job.get("job_description", "")).lower()
+    location = job_location_string(job).lower()
+
+    score += FIT_SCORE.get(fit_bucket, 0)
+    score += SPONSOR_SCORE.get(sponsor_tier, 0)
+    score += QUALITY_SCORE.get(quality_tier, 0)
+
+    if "new grad" in reasons or "entry-level" in reasons or "0-1 years" in reasons:
+        score += 8
+    if "remote" in location:
+        score += 4
+    if any(city in location for city in ("new york", "los angeles", "san francisco", "miami")):
+        score += 4
+    if fit_bucket == "unknown":
+        score -= 8
+    if "2+ years" in reasons:
+        score -= 12
+    if "contract" in title or "contract" in description[:1500]:
+        score -= 15
+    if sponsor_tier == "unknown_no_ban":
+        score -= 3
+
+    return max(0, min(100, score))
+
+
+def normalize_job_record(job, now=None, status="new"):
+    now = now or utc_now_iso()
+    raw_payload = dict(job)
+    description = clean_text(job.get("job_description", ""))
+    return {
+        "job_id": job.get("job_id", ""),
+        "title": job.get("job_title", ""),
+        "company": job.get("employer_name", ""),
+        "location_text": job_location_string(job),
+        "apply_url": job.get("job_apply_link", ""),
+        "source": job.get("source", ""),
+        "ats": ats_from_source(job.get("source", "")),
+        "first_seen_at": now,
+        "last_seen_at": now,
+        "fit_bucket": job.get("fit_bucket") or "unknown",
+        "fit_reasons": list(job.get("fit_reasons") or []),
+        "sponsor_tier": job.get("sponsor_tier") or "unknown_no_ban",
+        "sponsor_reasons": list(job.get("sponsor_reasons") or []),
+        "quality_tier": job.get("quality_tier") or "acceptable",
+        "sector": job.get("sector") or "unknown",
+        "applicability_score": calculate_applicability_score(job),
+        "status": status,
+        "description_excerpt": description[:1200],
+        "raw_payload": raw_payload,
+    }
+
+
+def migrated_seen_record(job_id, now=None):
+    now = now or utc_now_iso()
+    return {
+        "job_id": job_id,
+        "title": "Previously seen job",
+        "company": "Unknown",
+        "location_text": "Unknown",
+        "apply_url": "",
+        "source": "seen_jobs.json",
+        "ats": "legacy",
+        "first_seen_at": now,
+        "last_seen_at": now,
+        "fit_bucket": "unknown",
+        "fit_reasons": [],
+        "sponsor_tier": "unknown_no_ban",
+        "sponsor_reasons": [],
+        "quality_tier": "acceptable",
+        "sector": "legacy",
+        "applicability_score": 0,
+        "status": "archived",
+        "description_excerpt": "",
+        "raw_payload": {"migrated_from": "seen_jobs.json", "legacy_job_id": job_id},
+    }
+
+
+def counts_by_source(jobs):
+    return dict(Counter(job.get("source", "unknown") for job in jobs))
+
+
+class SupabaseJobStore:
+    def __init__(self, url=None, key=None, session=None):
+        self.url = (url or os.getenv("SUPABASE_URL") or "").rstrip("/")
+        self.key = (
+            key
+            or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            or os.getenv("SUPABASE_KEY")
+            or os.getenv("SUPABASE_ANON_KEY")
+            or ""
+        )
+        self.session = session or requests.Session()
+        if not self.url or not self.key:
+            raise RuntimeError(
+                "Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_KEY."
+            )
+
+    @property
+    def headers(self):
+        return {
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
+            "Content-Type": "application/json",
+        }
+
+    def _request(self, method, path, **kwargs):
+        response = self.session.request(
+            method,
+            f"{self.url}{path}",
+            headers={**self.headers, **kwargs.pop("headers", {})},
+            timeout=kwargs.pop("timeout", 60),
+            **kwargs,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Supabase {method} {path} failed: {response.text}")
+        if not response.text:
+            return None
+        return response.json()
+
+    def create_run(self, mode):
+        data = self._request(
+            "POST",
+            "/rest/v1/job_runs",
+            headers={"Prefer": "return=representation"},
+            json={"mode": mode, "status": "running"},
+        )
+        return data[0]["id"]
+
+    def finish_run(
+        self,
+        run_id,
+        status,
+        total_found=0,
+        total_written=0,
+        total_new=0,
+        counts=None,
+        failures=None,
+        error=None,
+    ):
+        if not run_id:
+            return None
+        payload = {
+            "status": status,
+            "finished_at": utc_now_iso(),
+            "total_found": total_found,
+            "total_written": total_written,
+            "total_new": total_new,
+            "counts_by_source": counts or {},
+            "failures": failures or [],
+            "error": error,
+        }
+        return self._request(
+            "PATCH",
+            f"/rest/v1/job_runs?id=eq.{run_id}",
+            headers={"Prefer": "return=minimal"},
+            json=payload,
+        )
+
+    def upsert_jobs(self, jobs, dry_run=False):
+        records = [normalize_job_record(job) for job in jobs if job.get("job_id")]
+        if dry_run:
+            return {
+                "records": records,
+                "total_written": len(records),
+                "total_new": 0,
+                "dry_run": True,
+            }
+        data = self._request(
+            "POST",
+            "/rest/v1/rpc/upsert_jobs",
+            json={"payload": records},
+            timeout=120,
+        )
+        return {
+            "records": records,
+            "total_written": len(data or []),
+            "total_new": sum(1 for row in data or [] if row.get("inserted")),
+            "dry_run": False,
+        }
+
+    def upsert_records(self, records, dry_run=False):
+        if dry_run:
+            return {
+                "records": records,
+                "total_written": len(records),
+                "total_new": 0,
+                "dry_run": True,
+            }
+        data = self._request(
+            "POST",
+            "/rest/v1/rpc/upsert_jobs",
+            json={"payload": records},
+            timeout=120,
+        )
+        return {
+            "records": records,
+            "total_written": len(data or []),
+            "total_new": sum(1 for row in data or [] if row.get("inserted")),
+            "dry_run": False,
+        }

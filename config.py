@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Email settings ──────────────────────────────────────────────
-SENDER_EMAIL = os.environ["SENDER_EMAIL"]
-SENDER_PASSWORD = os.environ["SENDER_PASSWORD"]
-RECIPIENT_EMAIL = os.environ["RECIPIENT_EMAIL"]
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "")
+RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "")
 
 # ── Getro-powered VC portfolio job boards ──────────────────────
 # Public Next.js boards with embedded JSON — simple HTTP scraping.
@@ -62,24 +62,74 @@ CONSIDER_BOARDS = {
     "GV": "https://jobs.gv.com",
 }
 
-# ── Role search queries ────────────────────────────────────────
-# Each query triggers a separate search on every board; keep this list tight.
-ROLE_QUERIES = [
-    "chief of staff",
-    "operations",
-    "business operations",
-    "strategy",
-    "strategic finance",
-    "special projects",
-]
+# ── Role tiers ──────────────────────────────────────────────────
+# A job's title must match a keyword in one of these tiers or it is
+# excluded entirely. Tier number drives digest grouping/priority
+# (1 = highest). Precedence is top-down: tier 1 keywords are checked
+# first, so e.g. "New Grad Business Operations" matches tier 1.
+ROLE_TIERS = {
+    1: [  # Early career / new grad business roles
+        "new grad",
+        "new graduate",
+        "recent graduate",
+        "early career",
+        "entry level",
+        "entry-level",
+        "rotational",
+        "graduate program",
+        "analyst program",
+        "associate program",
+    ],
+    2: [  # Entry-level operations roles
+        "operations associate",
+        "operations analyst",
+        "operations coordinator",
+        "business operations associate",
+        "business operations analyst",
+        "strategy & operations associate",
+        "strategy and operations associate",
+        "strategy operations associate",
+        "program coordinator",
+        "special projects associate",
+    ],
+    3: [  # Broader ops / strategy fallback
+        "chief of staff",
+        "operations",
+        "business operations",
+        "strategy",
+        "special projects",
+    ],
+}
+
+# Flat list of all role keywords. Used verbatim as discovery search
+# queries (aggregators / Workday) and for title-side matching. Derived
+# from ROLE_TIERS — edit the tiers above, not this.
+ROLE_QUERIES = [kw for kws in ROLE_TIERS.values() for kw in kws]
 
 # ── Seniority filter ─────────────────────────────────────────
-# Skip roles with these keywords in the title. "manager" and "lead" used
-# to be here but were dropped — ops/strategy/CoS roles routinely carry
-# those titles at the 1-3yr level we're targeting.
+# Skip roles with these keywords in the title. "lead" is excluded per
+# request (no Lead-titled roles), alongside the senior/exec bands.
 SKIP_SENIORITY = [
     "senior", "sr.", "staff", "principal", "director",
-    "vp", "vice president", "head of",
+    "vp", "vice president", "head of", "lead",
+]
+
+# ── Hard exclusions ─────────────────────────────────────────
+# Any of these substrings in the title drops the job outright, even if
+# it also matched a role tier (e.g. "Engineering Operations", "Sales
+# Engineer"). Keeps engineering/technical/specialist functions out.
+EXCLUDE_KEYWORDS = [
+    "engineer", "engineering", "developer", "software",
+    "devops", "site reliability", "data scientist",
+    "machine learning", "designer", "architect",
+    "scientist", "qa ", "sdet",
+]
+
+# Full-time search only. These title terms are excluded even if a posting
+# otherwise has an early-career signal.
+INTERNSHIP_KEYWORDS = [
+    "intern", "internship", "co-op", "coop", "summer analyst",
+    "campus ambassador",
 ]
 
 # ── Location allowlist ──────────────────────────────────────
@@ -354,3 +404,10 @@ COMPANY_BOARDS = {
     #   - InsideTracker, Republic, Stori, Kushki, Pomelo (fintech): TBD
     #   - Cash App, Square: route through Block's Greenhouse (already wired via bu_filter)
 }
+
+# Registry-backed company selection. The legacy literals above document the
+# original seed list; these generated values are what the bot actually uses.
+from company_registry import company_allowlist, company_boards
+
+COMPANY_ALLOWLIST = company_allowlist()
+COMPANY_BOARDS = company_boards()
