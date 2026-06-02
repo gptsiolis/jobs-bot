@@ -229,6 +229,8 @@ tbody tr.is-selected:hover {
   padding: 0;
   text-align: left;
   font-weight: 700;
+  display: inline;
+  text-decoration: none;
 }
 
 .title-button:hover,

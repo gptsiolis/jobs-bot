@@ -127,15 +127,7 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
   const [location, setLocation] = useState("");
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
 
-  const selected = jobs.find((job) => job.job_id === selectedId) || jobs[0];
   const latestRun = runs[0];
-
-  function openJobPosting(job: JobRow) {
-    setSelectedId(job.job_id);
-    if (job.apply_url) {
-      window.open(job.apply_url, "_blank", "noopener,noreferrer");
-    }
-  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -156,6 +148,8 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
       );
     });
   }, [jobs, query, status, quality, sponsor, source, fit, location]);
+
+  const selected = filtered.find((job) => job.job_id === selectedId) || filtered[0] || null;
 
   const grouped = useMemo(() => {
     return filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
@@ -321,16 +315,31 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
                         >
                           <td className="score">{job.applicability_score}</td>
                           <td>
-                            <button
-                              className="title-button"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openJobPosting(job);
-                              }}
-                            >
-                              {job.title}
-                            </button>
+                            {job.apply_url ? (
+                              <a
+                                className="title-button"
+                                href={job.apply_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedId(job.job_id);
+                                }}
+                              >
+                                {job.title}
+                              </a>
+                            ) : (
+                              <button
+                                className="title-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedId(job.job_id);
+                                }}
+                              >
+                                {job.title}
+                              </button>
+                            )}
                           </td>
                           <td>{job.company}</td>
                           <td>{job.location_text}</td>
