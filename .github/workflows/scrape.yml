@@ -13,8 +13,8 @@ on:
           - discovery
           - all
   schedule:
-    - cron: "20 13 * * *"
-    - cron: "40 14 * * 1"
+    - cron: "0 19 * * *"
+    - cron: "40 19 * * *"
 
 jobs:
   scrape:
@@ -47,7 +47,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "40 14 * * 1" ]; then
+          elif [ "${{ github.event.schedule }}" = "40 19 * * *" ]; then
             echo "mode=discovery" >> "$GITHUB_OUTPUT"
           else
             echo "mode=watchlist" >> "$GITHUB_OUTPUT"
