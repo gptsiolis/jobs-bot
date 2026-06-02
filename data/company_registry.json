@@ -77,6 +77,7 @@
     {"name": "Superpower", "sector": "consumer_health", "quality_tier": "strong", "sponsor_tier": "unknown_no_ban", "ats": {"type": "ashby", "slug": "superpower"}},
     {"name": "Hims & Hers", "sector": "consumer_health", "quality_tier": "strong", "sponsor_tier": "strong_history", "ats": {"type": "ashby", "slug": "hims-and-hers"}},
 
+    {"name": "Stockbridge", "sector": "alternative_assets", "quality_tier": "strong", "sponsor_tier": "unknown_no_ban", "ats": {"type": "dayforce", "company": "stockbridge"}},
     {"name": "Airbnb", "sector": "commerce_marketplaces", "quality_tier": "excellent", "sponsor_tier": "strong_history", "ats": {"type": "greenhouse", "slug": "airbnb"}},
     {"name": "Adobe", "sector": "saas", "quality_tier": "excellent", "sponsor_tier": "strong_history", "enabled": false},
     {"name": "Atlassian", "sector": "saas", "quality_tier": "excellent", "sponsor_tier": "strong_history", "ats": {"type": "lever", "slug": "atlassian"}},

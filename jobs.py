@@ -19,7 +19,10 @@ from company_registry import (
     metadata_for_company,
     sponsor_label,
 )
-from scrapers import getro, consider, yc, wellfound, greenhouse, lever, ashby, workday, workable, smartrecruiters
+from scrapers import (
+    getro, consider, yc, wellfound, greenhouse, lever, ashby, workday,
+    workable, smartrecruiters, dayforce,
+)
 from scrapers.filters import FIT_BUCKET_LABELS, add_fit_metadata
 from storage import SupabaseJobStore, counts_by_source, normalize_job_record
 
@@ -158,6 +161,8 @@ def _format_source_label(source):
         return source.replace("ashby:", "")
     if source.startswith("workday:"):
         return source.replace("workday:", "")
+    if source.startswith("dayforce:"):
+        return source.replace("dayforce:", "")
     if source == "Y Combinator":
         return "Y Combinator (Work at a Startup)"
     if source == "Wellfound":
@@ -313,6 +318,7 @@ def collect_watchlist_jobs():
     all_jobs.extend(workday.scrape_all(COMPANY_BOARDS))
     all_jobs.extend(workable.scrape_all(COMPANY_BOARDS))
     all_jobs.extend(smartrecruiters.scrape_all(COMPANY_BOARDS))
+    all_jobs.extend(dayforce.scrape_all(COMPANY_BOARDS))
 
     return _prepare_jobs(all_jobs)
 
@@ -335,6 +341,7 @@ _ATS_TO_MODULE = {
     "workday": workday,
     "workable": workable,
     "smartrecruiters": smartrecruiters,
+    "dayforce": dayforce,
 }
 
 
@@ -459,6 +466,12 @@ def run_test(company_query):
             matched_name, cfg["slug"],
             brand_filter=cfg.get("brand_filter"),
             segment_filter=cfg.get("segment_filter"),
+        )
+    elif ats == "dayforce":
+        jobs = module.scrape_company(
+            matched_name,
+            cfg["company"],
+            board_code=cfg.get("board_code"),
         )
     else:
         jobs = module.scrape_company(matched_name, cfg["slug"])
