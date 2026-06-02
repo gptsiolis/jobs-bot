@@ -21,7 +21,7 @@ from company_registry import (
 )
 from scrapers import (
     getro, consider, yc, wellfound, greenhouse, lever, ashby, workday,
-    workable, smartrecruiters, dayforce,
+    workable, smartrecruiters, dayforce, board_resolver,
 )
 from scrapers.filters import FIT_BUCKET_LABELS, add_fit_metadata
 from storage import SupabaseJobStore, counts_by_source, normalize_job_record
@@ -246,6 +246,72 @@ def _prepare_jobs(jobs):
     return jobs
 
 
+def _apply_board_metadata(jobs, company_boards):
+    metadata_by_company = {
+        name.lower(): {
+            "sector": cfg.get("sector", "other"),
+            "quality_tier": cfg.get("quality_tier", "acceptable"),
+            "sponsor_tier": cfg.get("sponsor_tier", "unknown_no_ban"),
+            "source_notes": cfg.get("source_notes", ""),
+        }
+        for name, cfg in company_boards.items()
+    }
+    for job in jobs:
+        metadata = metadata_by_company.get((job.get("employer_name") or "").lower())
+        if not metadata:
+            continue
+        for key, value in metadata.items():
+            job.setdefault(key, value)
+    return jobs
+
+
+def _load_dynamic_company_boards(store=None):
+    try:
+        store = store or SupabaseJobStore()
+        requests = store.list_company_watchlist_requests()
+    except RuntimeError:
+        return {}
+
+    boards = {}
+    for request in requests:
+        company_name = request.get("company_name") or ""
+        status = request.get("status")
+        ats_config = request.get("ats_config")
+        if status == "resolved" and ats_config:
+            config = dict(ats_config)
+        elif status in {"pending", "unresolved"}:
+            config, error = board_resolver.resolve_company_board(company_name)
+            if not config:
+                store.update_company_watchlist_request(
+                    request["id"],
+                    "unresolved",
+                    ats_config=None,
+                    error=error or "No supported public ATS board found",
+                )
+                continue
+            store.update_company_watchlist_request(
+                request["id"],
+                "resolved",
+                ats_config=config,
+                error=None,
+            )
+        else:
+            continue
+
+        config.setdefault("sector", request.get("sector") or "user_added")
+        config.setdefault("quality_tier", request.get("quality_tier") or "acceptable")
+        config.setdefault("sponsor_tier", request.get("sponsor_tier") or "unknown_no_ban")
+        config.setdefault("source_notes", request.get("source_notes") or "Added from dashboard")
+        boards[company_name] = config
+    return boards
+
+
+def _company_boards_for_watchlist(store=None):
+    boards = dict(COMPANY_BOARDS)
+    boards.update(_load_dynamic_company_boards(store=store))
+    return boards
+
+
 def collect_discovery_jobs():
     """Mode A — broad sweep across VC portfolio boards + YC + Wellfound.
 
@@ -302,7 +368,7 @@ def run_discovery(seen):
     )
 
 
-def collect_watchlist_jobs():
+def collect_watchlist_jobs(store=None):
     """Mode B — per-company ATS scrapers for the curated allowlist.
 
     Hits each allowlisted company's own Greenhouse/Lever/Ashby board directly
@@ -311,15 +377,17 @@ def collect_watchlist_jobs():
     print("="*50)
     print("WATCHLIST MODE — per-company ATS scrapers")
     print("="*50)
+    company_boards = _company_boards_for_watchlist(store=store)
     all_jobs = []
-    all_jobs.extend(greenhouse.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(lever.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(ashby.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(workday.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(workable.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(smartrecruiters.scrape_all(COMPANY_BOARDS))
-    all_jobs.extend(dayforce.scrape_all(COMPANY_BOARDS))
+    all_jobs.extend(greenhouse.scrape_all(company_boards))
+    all_jobs.extend(lever.scrape_all(company_boards))
+    all_jobs.extend(ashby.scrape_all(company_boards))
+    all_jobs.extend(workday.scrape_all(company_boards))
+    all_jobs.extend(workable.scrape_all(company_boards))
+    all_jobs.extend(smartrecruiters.scrape_all(company_boards))
+    all_jobs.extend(dayforce.scrape_all(company_boards))
 
+    _apply_board_metadata(all_jobs, company_boards)
     return _prepare_jobs(all_jobs)
 
 
@@ -352,15 +420,15 @@ def _scraper_failures():
     return failures
 
 
-def collect_jobs_for_mode(mode):
+def collect_jobs_for_mode(mode, store=None):
     if mode == "watchlist":
-        return collect_watchlist_jobs()
+        return collect_watchlist_jobs(store=store)
     if mode == "discovery":
         return collect_discovery_jobs()
     if mode == "all":
         jobs = []
         jobs.extend(collect_discovery_jobs())
-        jobs.extend(collect_watchlist_jobs())
+        jobs.extend(collect_watchlist_jobs(store=store))
         return jobs
     raise ValueError(f"Unknown sync mode: {mode!r}")
 
@@ -379,7 +447,7 @@ def run_sync(mode, dry_run=False):
     try:
         if store:
             run_id = store.create_run(mode)
-        jobs = collect_jobs_for_mode(mode)
+        jobs = collect_jobs_for_mode(mode, store=store)
         source_counts = counts_by_source(jobs)
         if dry_run:
             normalized = [normalize_job_record(job) for job in jobs if job.get("job_id")]
@@ -434,22 +502,21 @@ def run_test(company_query):
     """Dry-run a single company. Prints matches; sends no email, updates no state."""
     query_norm = company_query.lower().strip()
     # Prefer exact match; fall back to substring
-    matched_name = next(
-        (n for n in COMPANY_BOARDS if n.lower() == query_norm), None,
-    )
+    company_boards = _company_boards_for_watchlist()
+    matched_name = next((n for n in company_boards if n.lower() == query_norm), None)
     if not matched_name:
         matched_name = next(
-            (n for n in COMPANY_BOARDS if query_norm in n.lower()), None,
+            (n for n in company_boards if query_norm in n.lower()), None,
         )
 
     if not matched_name:
         print(f"No company in COMPANY_BOARDS matches {company_query!r}.")
         print(f"Available companies:")
-        for name in sorted(COMPANY_BOARDS):
+        for name in sorted(company_boards):
             print(f"  - {name}")
         sys.exit(1)
 
-    cfg = COMPANY_BOARDS[matched_name]
+    cfg = company_boards[matched_name]
     ats = cfg.get("ats")
     module = _ATS_TO_MODULE.get(ats)
     if not module:

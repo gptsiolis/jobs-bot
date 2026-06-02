@@ -1,18 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Archive,
   Bookmark,
   CheckCircle2,
   ExternalLink,
+  Play,
+  Plus,
   RotateCcw,
   Search,
   XCircle
 } from "lucide-react";
-import { updateJobStatus } from "@/app/actions";
-import type { JobRow, JobRun, JobStatus } from "@/lib/types";
+import {
+  addCompanyWatchlistRequest,
+  triggerScraperRun,
+  updateJobStatus
+} from "@/app/actions";
+import type { CompanyWatchlistRequest, JobRow, JobRun, JobStatus } from "@/lib/types";
 
 const fitOrder = ["strong", "possible", "unknown", "reject"];
 const statusLabels: Record<JobStatus, string> = {
@@ -117,7 +123,20 @@ function JobActions({ job }: { job: JobRow }) {
   );
 }
 
-export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }) {
+function atsLabel(request: CompanyWatchlistRequest) {
+  const ats = request.ats_config?.ats;
+  return typeof ats === "string" ? ats : request.status;
+}
+
+export function JobsDashboard({
+  jobs,
+  runs,
+  companyRequests
+}: {
+  jobs: JobRow[];
+  runs: JobRun[];
+  companyRequests: CompanyWatchlistRequest[];
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("active");
   const [quality, setQuality] = useState("");
@@ -126,6 +145,14 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
   const [fit, setFit] = useState("");
   const [location, setLocation] = useState("");
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
+  const [runState, runAction, runPending] = useActionState(triggerScraperRun, {
+    ok: true,
+    message: ""
+  });
+  const [companyState, companyAction, companyPending] = useActionState(
+    addCompanyWatchlistRequest,
+    { ok: true, message: "" }
+  );
 
   const latestRun = runs[0];
 
@@ -191,6 +218,60 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
               ? `${latestRun.mode} ${latestRun.status}, ${latestRun.total_new} new`
               : "No runs"}
           </span>
+        </div>
+      </section>
+
+      <section className="controls-grid">
+        <div className="control-panel">
+          <h2>Scrapers</h2>
+          <div className="button-row">
+            <form action={runAction}>
+              <input type="hidden" name="mode" value="watchlist" />
+              <button className="primary-button" type="submit" disabled={runPending}>
+                <Play size={15} />
+                Watchlist
+              </button>
+            </form>
+            <form action={runAction}>
+              <input type="hidden" name="mode" value="discovery" />
+              <button className="primary-button" type="submit" disabled={runPending}>
+                <Play size={15} />
+                Discovery
+              </button>
+            </form>
+          </div>
+          {runState.message ? (
+            <span className={runState.ok ? "action-message" : "action-message is-error"}>
+              {runState.message}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="control-panel">
+          <h2>Company Watchlist</h2>
+          <form action={companyAction} className="inline-form">
+            <input name="company_name" placeholder="Company name" />
+            <button className="primary-button" type="submit" disabled={companyPending}>
+              <Plus size={15} />
+              Add
+            </button>
+          </form>
+          {companyState.message ? (
+            <span className={companyState.ok ? "action-message" : "action-message is-error"}>
+              {companyState.message}
+            </span>
+          ) : null}
+          {companyRequests.length ? (
+            <div className="request-list">
+              {companyRequests.map((request) => (
+                <div className="request-row" key={request.id}>
+                  <strong>{request.company_name}</strong>
+                  <span className="pill">{atsLabel(request)}</span>
+                  {request.last_error ? <span className="muted">{request.last_error}</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { JobsDashboard } from "@/components/jobs-dashboard";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { JobRow, JobRun } from "@/lib/types";
+import type { CompanyWatchlistRequest, JobRow, JobRun } from "@/lib/types";
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
@@ -12,7 +12,11 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  const [{ data: jobs, error: jobsError }, { data: runs }] = await Promise.all([
+  const [
+    { data: jobs, error: jobsError },
+    { data: runs },
+    { data: companyRequests }
+  ] = await Promise.all([
     supabase
       .from("jobs")
       .select(
@@ -25,7 +29,12 @@ export default async function HomePage() {
       .from("job_runs")
       .select("id,mode,status,started_at,finished_at,total_found,total_written,total_new,failures")
       .order("started_at", { ascending: false })
-      .limit(5)
+      .limit(5),
+    supabase
+      .from("company_watchlist_requests")
+      .select("id,company_name,normalized_name,status,ats_config,last_checked_at,last_error,created_at")
+      .order("created_at", { ascending: false })
+      .limit(8)
   ]);
 
   if (jobsError) {
@@ -46,7 +55,11 @@ export default async function HomePage() {
         </form>
       </header>
       <main className="main">
-        <JobsDashboard jobs={(jobs || []) as JobRow[]} runs={(runs || []) as JobRun[]} />
+        <JobsDashboard
+          jobs={(jobs || []) as JobRow[]}
+          runs={(runs || []) as JobRun[]}
+          companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
+        />
       </main>
     </div>
   );

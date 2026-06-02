@@ -39,3 +39,13 @@ export type JobRun = {
   total_new: number;
   failures: unknown[];
 };
+export type CompanyWatchlistRequest = {
+  id: string;
+  company_name: string;
+  normalized_name: string;
+  status: "pending" | "resolved" | "unresolved" | "disabled";
+  ats_config: Record<string, unknown> | null;
+  last_checked_at: string | null;
+  last_error: string | null;
+  created_at: string;
+};

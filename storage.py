@@ -7,7 +7,9 @@ dependency. Scheduled runs should use a service-role key.
 import datetime as _dt
 import os
 import re
+import time
 from collections import Counter
+from urllib.parse import quote
 
 import requests
 
@@ -27,6 +29,7 @@ WATCHLIST_SOURCE_PREFIXES = (
     "workday:",
     "workable:",
     "smartrecruiters:",
+    "dayforce:",
 )
 
 FIT_SCORE = {
@@ -46,6 +49,9 @@ QUALITY_SCORE = {
     "strong": 10,
     "acceptable": 3,
 }
+
+UPSERT_CHUNK_SIZE = 40
+UPSERT_RETRIES = 3
 
 
 def utc_now_iso():
@@ -269,12 +275,7 @@ class SupabaseJobStore:
                 "total_new": 0,
                 "dry_run": True,
             }
-        data = self._request(
-            "POST",
-            "/rest/v1/rpc/upsert_jobs",
-            json={"payload": records},
-            timeout=120,
-        )
+        data = self._upsert_normalized_records(records)
         return {
             "records": records,
             "total_written": len(data or []),
@@ -290,12 +291,7 @@ class SupabaseJobStore:
                 "total_new": 0,
                 "dry_run": True,
             }
-        data = self._request(
-            "POST",
-            "/rest/v1/rpc/upsert_jobs",
-            json={"payload": records},
-            timeout=120,
-        )
+        data = self._upsert_normalized_records(records)
         return {
             "records": records,
             "total_written": len(data or []),
@@ -303,6 +299,25 @@ class SupabaseJobStore:
             "dry_run": False,
         }
 
+    def _upsert_normalized_records(self, records):
+        written = []
+        for start in range(0, len(records), UPSERT_CHUNK_SIZE):
+            chunk = records[start : start + UPSERT_CHUNK_SIZE]
+            for attempt in range(1, UPSERT_RETRIES + 1):
+                try:
+                    data = self._request(
+                        "POST",
+                        "/rest/v1/rpc/upsert_jobs",
+                        json={"payload": chunk},
+                        timeout=180,
+                    )
+                    written.extend(data or [])
+                    break
+                except requests.RequestException:
+                    if attempt == UPSERT_RETRIES:
+                        raise
+                    time.sleep(2 * attempt)
+        return written
     def archive_unmatched_new_jobs(self, current_job_ids, source_prefixes=None):
         data = self._request(
             "POST",
@@ -323,3 +338,27 @@ class SupabaseJobStore:
             timeout=120,
         )
         return int(data or 0)
+
+    def list_company_watchlist_requests(self):
+        return self._request(
+            "GET",
+            "/rest/v1/company_watchlist_requests"
+            "?select=id,company_name,normalized_name,status,ats_config,sector,quality_tier,"
+            "sponsor_tier,source_notes,last_checked_at,last_error"
+            "&status=in.(pending,resolved,unresolved)"
+            "&order=created_at.asc",
+        ) or []
+
+    def update_company_watchlist_request(self, request_id, status, ats_config=None, error=None):
+        payload = {
+            "status": status,
+            "ats_config": ats_config,
+            "last_checked_at": utc_now_iso(),
+            "last_error": error,
+        }
+        return self._request(
+            "PATCH",
+            f"/rest/v1/company_watchlist_requests?id=eq.{quote(str(request_id), safe='')}",
+            headers={"Prefer": "return=minimal"},
+            json=payload,
+        )

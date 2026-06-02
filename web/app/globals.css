@@ -385,3 +385,86 @@ tbody tr.is-selected:hover {
     grid-template-columns: 1fr;
   }
 }
+.controls-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.control-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.control-panel h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.button-row,
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-form input {
+  min-width: 0;
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0 10px;
+}
+
+.action-message {
+  display: block;
+  margin-top: 8px;
+  color: var(--good);
+  font-size: 13px;
+}
+
+.action-message.is-error {
+  color: var(--bad);
+}
+
+.request-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.request-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row,
+  .inline-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .button-row form,
+  .button-row button,
+  .inline-form button {
+    width: 100%;
+  }
+
+  .request-row {
+    grid-template-columns: 1fr;
+  }
+}
