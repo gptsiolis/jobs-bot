@@ -316,21 +316,8 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
                       {grouped[bucket].map((job) => (
                         <tr
                           key={job.job_id}
-                          className={[
-                            job.job_id === selected?.job_id ? "is-selected" : "",
-                            job.apply_url ? "is-clickable" : ""
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          role={job.apply_url ? "link" : undefined}
-                          tabIndex={job.apply_url ? 0 : undefined}
-                          onClick={() => openJobPosting(job)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              openJobPosting(job);
-                            }
-                          }}
+                          className={job.job_id === selected?.job_id ? "is-selected" : ""}
+                          onClick={() => setSelectedId(job.job_id)}
                         >
                           <td className="score">{job.applicability_score}</td>
                           <td>
@@ -417,4 +404,3 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
     </>
   );
 }
-
