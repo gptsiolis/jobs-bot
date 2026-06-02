@@ -130,6 +130,13 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
   const selected = jobs.find((job) => job.job_id === selectedId) || jobs[0];
   const latestRun = runs[0];
 
+  function openJobPosting(job: JobRow) {
+    setSelectedId(job.job_id);
+    if (job.apply_url) {
+      window.open(job.apply_url, "_blank", "noopener,noreferrer");
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return jobs.filter((job) => {
@@ -309,14 +316,31 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
                       {grouped[bucket].map((job) => (
                         <tr
                           key={job.job_id}
-                          className={job.job_id === selected?.job_id ? "is-selected" : ""}
+                          className={[
+                            job.job_id === selected?.job_id ? "is-selected" : "",
+                            job.apply_url ? "is-clickable" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          role={job.apply_url ? "link" : undefined}
+                          tabIndex={job.apply_url ? 0 : undefined}
+                          onClick={() => openJobPosting(job)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openJobPosting(job);
+                            }
+                          }}
                         >
                           <td className="score">{job.applicability_score}</td>
                           <td>
                             <button
                               className="title-button"
                               type="button"
-                              onClick={() => setSelectedId(job.job_id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openJobPosting(job);
+                              }}
                             >
                               {job.title}
                             </button>
@@ -328,7 +352,7 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
                           </td>
                           <td>{job.sponsor_tier.replaceAll("_", " ")}</td>
                           <td>{formatDate(job.last_seen_at)}</td>
-                          <td>
+                          <td onClick={(event) => event.stopPropagation()}>
                             <JobActions job={job} />
                           </td>
                         </tr>
@@ -393,3 +417,4 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
     </>
   );
 }
+

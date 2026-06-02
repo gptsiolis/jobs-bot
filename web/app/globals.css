@@ -203,6 +203,18 @@ tr.is-selected {
   background: #eef6ff;
 }
 
+tr.is-clickable {
+  cursor: pointer;
+}
+
+tr.is-clickable:hover {
+  background: #f4f9ff;
+}
+
+tr.is-clickable.is-selected:hover {
+  background: #e6f2ff;
+}
+
 .title-button,
 .text-button,
 .icon-button,
@@ -375,3 +387,4 @@ tr.is-selected {
     grid-template-columns: 1fr;
   }
 }
+
