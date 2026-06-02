@@ -368,6 +368,7 @@ def run_sync(mode, dry_run=False):
     jobs = []
     result = {"total_written": 0, "total_new": 0}
     archived_stale = 0
+    rejected_stale = 0
     try:
         if store:
             run_id = store.create_run(mode)
@@ -387,6 +388,7 @@ def run_sync(mode, dry_run=False):
                 archived_stale = store.archive_unmatched_new_jobs(
                     [job["job_id"] for job in jobs if job.get("job_id")]
                 )
+                rejected_stale = store.reject_stale_applied_jobs(max_age_days=60)
         if store:
             store.finish_run(
                 run_id,
@@ -404,6 +406,8 @@ def run_sync(mode, dry_run=False):
         )
         if archived_stale:
             print(f"[Sync] Archived {archived_stale} unmatched new watchlist jobs.")
+        if rejected_stale:
+            print(f"[Sync] Rejected {rejected_stale} applied jobs older than 60 days.")
     except Exception as exc:
         if store and run_id:
             store.finish_run(

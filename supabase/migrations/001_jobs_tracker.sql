@@ -23,8 +23,13 @@ create table if not exists public.jobs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint jobs_status_check check (
-    status in ('new', 'saved', 'applied', 'dismissed', 'archived')
+    status in ('new', 'saved', 'applied', 'next_round', 'rejected', 'dismissed', 'archived')
   )
+);
+
+alter table public.jobs drop constraint if exists jobs_status_check;
+alter table public.jobs add constraint jobs_status_check check (
+  status in ('new', 'saved', 'applied', 'next_round', 'rejected', 'dismissed', 'archived')
 );
 
 create table if not exists public.job_runs (
@@ -212,6 +217,36 @@ $$;
 
 revoke all on function public.archive_unmatched_new_jobs(jsonb, text[]) from public, anon, authenticated;
 grant execute on function public.archive_unmatched_new_jobs(jsonb, text[]) to service_role;
+
+create or replace function public.reject_stale_applied_jobs(max_age_days integer default 60)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  rejected_count integer;
+begin
+  update public.jobs j
+  set status = 'rejected'
+  where j.status = 'applied'
+    and coalesce(
+      (
+        select max(e.created_at)
+        from public.job_events e
+        where e.job_id = j.job_id
+          and e.new_status = 'applied'
+      ),
+      j.updated_at
+    ) < now() - make_interval(days => max_age_days);
+
+  get diagnostics rejected_count = row_count;
+  return rejected_count;
+end;
+$$;
+
+revoke all on function public.reject_stale_applied_jobs(integer) from public, anon, authenticated;
+grant execute on function public.reject_stale_applied_jobs(integer) to service_role;
 
 alter table public.jobs enable row level security;
 alter table public.job_runs enable row level security;

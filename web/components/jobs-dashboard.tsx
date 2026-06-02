@@ -19,6 +19,8 @@ const statusLabels: Record<JobStatus, string> = {
   new: "New",
   saved: "Saved",
   applied: "Applied",
+  next_round: "Next Round",
+  rejected: "Rejected",
   dismissed: "Dismissed",
   archived: "Archived"
 };
@@ -28,6 +30,8 @@ const phaseTabs = [
   { value: "new", label: "New" },
   { value: "saved", label: "Saved" },
   { value: "applied", label: "Applied" },
+  { value: "next_round", label: "Next Round" },
+  { value: "rejected", label: "Rejected" },
   { value: "dismissed", label: "Dismissed" },
   { value: "archived", label: "Archived" }
 ];
@@ -65,6 +69,51 @@ function StatusAction({
         {children}
       </button>
     </form>
+  );
+}
+
+function JobActions({ job }: { job: JobRow }) {
+  if (job.status === "applied") {
+    return (
+      <div className="status-actions">
+        <StatusAction jobId={job.job_id} status="next_round" title="Moved to next round">
+          <CheckCircle2 size={16} />
+        </StatusAction>
+        <StatusAction jobId={job.job_id} status="rejected" title="Rejected">
+          <XCircle size={16} />
+        </StatusAction>
+      </div>
+    );
+  }
+
+  if (job.status === "next_round" || job.status === "rejected") {
+    return (
+      <div className="status-actions">
+        <StatusAction jobId={job.job_id} status="applied" title="Back to applied">
+          <RotateCcw size={16} />
+        </StatusAction>
+      </div>
+    );
+  }
+
+  return (
+    <div className="status-actions">
+      <StatusAction jobId={job.job_id} status="saved" title="Save">
+        <Bookmark size={16} />
+      </StatusAction>
+      <StatusAction jobId={job.job_id} status="applied" title="Applied">
+        <CheckCircle2 size={16} />
+      </StatusAction>
+      <StatusAction jobId={job.job_id} status="dismissed" title="Dismiss">
+        <XCircle size={16} />
+      </StatusAction>
+      <StatusAction jobId={job.job_id} status="archived" title="Archive">
+        <Archive size={16} />
+      </StatusAction>
+      <StatusAction jobId={job.job_id} status="new" title="Reopen">
+        <RotateCcw size={16} />
+      </StatusAction>
+    </div>
   );
 }
 
@@ -280,23 +329,7 @@ export function JobsDashboard({ jobs, runs }: { jobs: JobRow[]; runs: JobRun[] }
                           <td>{job.sponsor_tier.replaceAll("_", " ")}</td>
                           <td>{formatDate(job.last_seen_at)}</td>
                           <td>
-                            <div className="status-actions">
-                              <StatusAction jobId={job.job_id} status="saved" title="Save">
-                                <Bookmark size={16} />
-                              </StatusAction>
-                              <StatusAction jobId={job.job_id} status="applied" title="Applied">
-                                <CheckCircle2 size={16} />
-                              </StatusAction>
-                              <StatusAction jobId={job.job_id} status="dismissed" title="Dismiss">
-                                <XCircle size={16} />
-                              </StatusAction>
-                              <StatusAction jobId={job.job_id} status="archived" title="Archive">
-                                <Archive size={16} />
-                              </StatusAction>
-                              <StatusAction jobId={job.job_id} status="new" title="Reopen">
-                                <RotateCcw size={16} />
-                              </StatusAction>
-                            </div>
+                            <JobActions job={job} />
                           </td>
                         </tr>
                       ))}

@@ -28,6 +28,8 @@ class FakeSession:
         self.calls.append((method, url, kwargs))
         if url.endswith("/rest/v1/rpc/archive_unmatched_new_jobs"):
             return FakeResponse(17)
+        if url.endswith("/rest/v1/rpc/reject_stale_applied_jobs"):
+            return FakeResponse(3)
         return FakeResponse([{"job_id": "greenhouse-123", "inserted": True}])
 
 
@@ -133,6 +135,23 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(method, "POST")
         self.assertTrue(url.endswith("/rest/v1/rpc/archive_unmatched_new_jobs"))
         self.assertEqual(kwargs["json"]["current_job_ids"], ["greenhouse-123"])
+
+
+class StaleAppliedStorageTests(unittest.TestCase):
+    def test_reject_stale_applied_jobs_uses_rpc(self):
+        session = FakeSession()
+        store = SupabaseJobStore(
+            url="https://example.supabase.co",
+            key="service-role",
+            session=session,
+        )
+        rejected = store.reject_stale_applied_jobs(max_age_days=60)
+
+        self.assertEqual(rejected, 3)
+        method, url, kwargs = session.calls[0]
+        self.assertEqual(method, "POST")
+        self.assertTrue(url.endswith("/rest/v1/rpc/reject_stale_applied_jobs"))
+        self.assertEqual(kwargs["json"]["max_age_days"], 60)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,11 @@
-export type JobStatus = "new" | "saved" | "applied" | "dismissed" | "archived";
+export type JobStatus =
+  | "new"
+  | "saved"
+  | "applied"
+  | "next_round"
+  | "rejected"
+  | "dismissed"
+  | "archived";
 
 export type JobRow = {
   job_id: string;

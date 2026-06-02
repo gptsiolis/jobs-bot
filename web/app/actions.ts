@@ -5,7 +5,15 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { JobStatus } from "@/lib/types";
 
-const allowedStatuses: JobStatus[] = ["new", "saved", "applied", "dismissed", "archived"];
+const allowedStatuses: JobStatus[] = [
+  "new",
+  "saved",
+  "applied",
+  "next_round",
+  "rejected",
+  "dismissed",
+  "archived"
+];
 
 export async function updateJobStatus(formData: FormData) {
   const jobId = String(formData.get("job_id") || "");

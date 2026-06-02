@@ -11,7 +11,15 @@ from collections import Counter
 
 import requests
 
-JOB_STATUSES = ("new", "saved", "applied", "dismissed", "archived")
+JOB_STATUSES = (
+    "new",
+    "saved",
+    "applied",
+    "next_round",
+    "rejected",
+    "dismissed",
+    "archived",
+)
 WATCHLIST_SOURCE_PREFIXES = (
     "greenhouse:",
     "lever:",
@@ -303,6 +311,15 @@ class SupabaseJobStore:
                 "current_job_ids": list(current_job_ids),
                 "source_prefixes": list(source_prefixes or WATCHLIST_SOURCE_PREFIXES),
             },
+            timeout=120,
+        )
+        return int(data or 0)
+
+    def reject_stale_applied_jobs(self, max_age_days=60):
+        data = self._request(
+            "POST",
+            "/rest/v1/rpc/reject_stale_applied_jobs",
+            json={"max_age_days": max_age_days},
             timeout=120,
         )
         return int(data or 0)
