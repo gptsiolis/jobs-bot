@@ -4,6 +4,16 @@ import { JobsDashboard } from "@/components/jobs-dashboard";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CompanyWatchlistRequest, JobRow, JobRun } from "@/lib/types";
 
+function formatHeaderDate(value: string | null) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -41,6 +51,8 @@ export default async function HomePage() {
     throw new Error(jobsError.message);
   }
 
+  const latestRun = ((runs || []) as JobRun[])[0];
+
   return (
     <div className="page">
       <header className="topbar">
@@ -48,16 +60,26 @@ export default async function HomePage() {
           <h1>Jobs Bot</h1>
           <span>{auth.user.email}</span>
         </div>
-        <form action={signOut}>
-          <button className="text-button" type="submit">
-            Sign out
-          </button>
-        </form>
+        <div className="topbar-actions">
+          <div className="run-chip">
+            <span className="muted">Last run</span>
+            <strong>
+              {latestRun
+                ? `${latestRun.mode} ${latestRun.status}, ${latestRun.total_new} new`
+                : "No runs"}
+            </strong>
+            {latestRun ? <span className="muted">{formatHeaderDate(latestRun.started_at)}</span> : null}
+          </div>
+          <form action={signOut}>
+            <button className="text-button" type="submit">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
       <main className="main">
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}
-          runs={(runs || []) as JobRun[]}
           companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
         />
       </main>

@@ -18,7 +18,7 @@ import {
   triggerScraperRun,
   updateJobStatus
 } from "@/app/actions";
-import type { CompanyWatchlistRequest, JobRow, JobRun, JobStatus } from "@/lib/types";
+import type { CompanyWatchlistRequest, JobRow, JobStatus } from "@/lib/types";
 
 const fitOrder = ["strong", "possible", "unknown", "reject"];
 const statusLabels: Record<JobStatus, string> = {
@@ -130,11 +130,9 @@ function atsLabel(request: CompanyWatchlistRequest) {
 
 export function JobsDashboard({
   jobs,
-  runs,
   companyRequests
 }: {
   jobs: JobRow[];
-  runs: JobRun[];
   companyRequests: CompanyWatchlistRequest[];
 }) {
   const [query, setQuery] = useState("");
@@ -153,8 +151,6 @@ export function JobsDashboard({
     addCompanyWatchlistRequest,
     { ok: true, message: "" }
   );
-
-  const latestRun = runs[0];
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -198,29 +194,6 @@ export function JobsDashboard({
 
   return (
     <>
-      <section className="summary-grid">
-        <div className="metric">
-          <strong>{jobs.length}</strong>
-          <span className="muted">Tracked</span>
-        </div>
-        <div className="metric">
-          <strong>{jobs.filter((job) => job.status === "new").length}</strong>
-          <span className="muted">New</span>
-        </div>
-        <div className="metric">
-          <strong>{jobs.filter((job) => job.status === "saved").length}</strong>
-          <span className="muted">Saved</span>
-        </div>
-        <div className="metric">
-          <strong>{latestRun ? formatDate(latestRun.started_at) : ""}</strong>
-          <span className="muted">
-            {latestRun
-              ? `${latestRun.mode} ${latestRun.status}, ${latestRun.total_new} new`
-              : "No runs"}
-          </span>
-        </div>
-      </section>
-
       <section className="controls-grid">
         <div className="control-panel">
           <h2>Scrapers</h2>
