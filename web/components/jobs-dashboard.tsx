@@ -3,7 +3,6 @@
 import { useActionState, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  Archive,
   Bookmark,
   CheckCircle2,
   ExternalLink,
@@ -39,7 +38,6 @@ const phaseTabs = [
   { value: "next_round", label: "Next Round" },
   { value: "rejected", label: "Rejected" },
   { value: "dismissed", label: "Dismissed" },
-  { value: "archived", label: "Archived" }
 ];
 
 function unique(values: string[]) {
@@ -112,9 +110,6 @@ function JobActions({ job }: { job: JobRow }) {
       </StatusAction>
       <StatusAction jobId={job.job_id} status="dismissed" title="Dismiss">
         <XCircle size={16} />
-      </StatusAction>
-      <StatusAction jobId={job.job_id} status="archived" title="Archive">
-        <Archive size={16} />
       </StatusAction>
       <StatusAction jobId={job.job_id} status="new" title="Reopen">
         <RotateCcw size={16} />
