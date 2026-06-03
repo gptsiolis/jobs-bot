@@ -110,9 +110,6 @@ function JobActions({ job }: { job: JobRow }) {
       <StatusAction jobId={job.job_id} status="dismissed" title="Dismiss">
         <XCircle size={16} />
       </StatusAction>
-      <StatusAction jobId={job.job_id} status="new" title="Reopen">
-        <RotateCcw size={16} />
-      </StatusAction>
     </div>
   );
 }
@@ -131,9 +128,7 @@ export function JobsDashboard({
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("active");
-  const [quality, setQuality] = useState("");
   const [sponsor, setSponsor] = useState("");
-  const [source, setSource] = useState("");
   const [fit, setFit] = useState("");
   const [location, setLocation] = useState("");
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
@@ -153,18 +148,16 @@ export function JobsDashboard({
         status === "active"
           ? job.status === "new" || job.status === "saved"
           : !status || job.status === status;
-      const text = `${job.title} ${job.company} ${job.location_text} ${job.source}`.toLowerCase();
+      const text = `${job.title} ${job.company} ${job.location_text}`.toLowerCase();
       return (
         activeMatch &&
-        (!quality || job.quality_tier === quality) &&
         (!sponsor || job.sponsor_tier === sponsor) &&
-        (!source || job.source === source) &&
         (!fit || job.fit_bucket === fit) &&
         (!location || job.location_text.includes(location)) &&
         (!q || text.includes(q))
       );
     });
-  }, [jobs, query, status, quality, sponsor, source, fit, location]);
+  }, [jobs, query, status, sponsor, fit, location]);
 
   const selected = filtered.find((job) => job.job_id === selectedId) || filtered[0] || null;
 
@@ -270,7 +263,7 @@ export function JobsDashboard({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Title, company, source"
+            placeholder="Title or company"
           />
         </label>
         <label>
@@ -296,32 +289,10 @@ export function JobsDashboard({
           </select>
         </label>
         <label>
-          <span className="muted">Quality</span>
-          <select value={quality} onChange={(event) => setQuality(event.target.value)}>
-            <option value="">All</option>
-            {unique(jobs.map((job) => job.quality_tier)).map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
           <span className="muted">Location</span>
           <select value={location} onChange={(event) => setLocation(event.target.value)}>
             <option value="">All</option>
             {locations.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="muted">Source</span>
-          <select value={source} onChange={(event) => setSource(event.target.value)}>
-            <option value="">All</option>
-            {unique(jobs.map((job) => job.source)).map((value) => (
               <option key={value} value={value}>
                 {value}
               </option>

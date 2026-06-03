@@ -104,7 +104,7 @@ select {
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(120px, 1fr));
+  grid-template-columns: minmax(300px, 2fr) repeat(3, minmax(170px, 1fr));
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -152,6 +152,7 @@ select {
 
 .filters label {
   display: grid;
+  min-width: 0;
   gap: 4px;
 }
 
@@ -164,6 +165,8 @@ select {
   color: var(--text);
   border-radius: 6px;
   padding: 0 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .content-grid {
@@ -500,4 +503,13 @@ tbody tr.is-selected:hover {
   .request-row {
     grid-template-columns: 1fr;
   }
+}
+
+.button-row form {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.button-row .primary-button {
+  width: 100%;
 }
