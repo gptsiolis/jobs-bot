@@ -37,7 +37,6 @@ const phaseTabs = [
   { value: "applied", label: "Applied" },
   { value: "next_round", label: "Next Round" },
   { value: "rejected", label: "Rejected" },
-  { value: "dismissed", label: "Dismissed" },
 ];
 
 function unique(values: string[]) {

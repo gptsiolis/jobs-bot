@@ -111,14 +111,15 @@ select {
 
 .phase-tabs {
   display: flex;
+  width: 100%;
   gap: 8px;
-  overflow-x: auto;
   margin: 0 0 14px;
   padding-bottom: 2px;
 }
 
 .phase-tab {
-  min-width: 120px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 42px;
   border: 1px solid var(--line);
   background: var(--panel);
@@ -130,6 +131,13 @@ select {
   gap: 10px;
   padding: 0 12px;
   cursor: pointer;
+}
+
+.phase-tab span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .phase-tab strong {
