@@ -81,31 +81,33 @@ export async function triggerScraperRun(
     };
   }
 
-  const response = await fetch(
-    `https://api.github.com/repos/${repository}/actions/workflows/scrape.yml/dispatches`,
-    {
+  const modes = mode === "all" ? ["watchlist", "discovery", "job_search"] : [mode];
+  const dispatchUrl = "https://api.github.com/repos/" + repository + "/actions/workflows/scrape.yml/dispatches";
+
+  for (const scraperMode of modes) {
+    const response = await fetch(dispatchUrl, {
       method: "POST",
       headers: {
         Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
+        Authorization: "Bearer " + token,
         "Content-Type": "application/json",
         "X-GitHub-Api-Version": "2022-11-28"
       },
-      body: JSON.stringify({ ref, inputs: { mode } }),
+      body: JSON.stringify({ ref, inputs: { mode: scraperMode } }),
       cache: "no-store"
-    }
-  );
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    return {
-      ok: false,
-      message: `GitHub rejected the run request (${response.status}): ${detail.slice(0, 140)}`
-    };
+    if (!response.ok) {
+      const detail = await response.text();
+      return {
+        ok: false,
+        message: "GitHub rejected " + scraperMode + " (" + String(response.status) + "): " + detail.slice(0, 140)
+      };
+    }
   }
 
   revalidatePath("/");
-  return { ok: true, message: "Scraper run started." };
+  return { ok: true, message: "Scraper runs started." };
 }
 
 export async function addCompanyWatchlistRequest(

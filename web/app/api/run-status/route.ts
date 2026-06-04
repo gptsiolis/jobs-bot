@@ -3,10 +3,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const fallbackEstimateSeconds: Record<string, number> = {
   watchlist: 12 * 60,
-  discovery: 18 * 60,
-  job_search: 20 * 60,
+  discovery: 40 * 60,
+  job_search: 15 * 60,
   source_expansion: 3 * 60,
-  all: 38 * 60
+  all: 65 * 60
 };
 
 type RunRow = {
@@ -23,6 +23,8 @@ type RunRow = {
   error?: string | null;
 };
 
+type EstimatedRun = RunRow & { estimate_seconds: number };
+
 function durationSeconds(run: Pick<RunRow, "started_at" | "finished_at">) {
   if (!run.started_at || !run.finished_at) return null;
   const started = new Date(run.started_at).getTime();
@@ -33,12 +35,41 @@ function durationSeconds(run: Pick<RunRow, "started_at" | "finished_at">) {
   return Math.round((finished - started) / 1000);
 }
 
+function elapsedSeconds(run: Pick<RunRow, "started_at">, now = Date.now()) {
+  const started = new Date(run.started_at).getTime();
+  if (!Number.isFinite(started) || now < started) return 0;
+  return Math.round((now - started) / 1000);
+}
+
 function median(values: number[]) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   if (sorted.length % 2) return sorted[middle];
   return Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+function estimateForMode(mode: string, runs: RunRow[]) {
+  const durations = runs
+    .filter((run) => run.mode === mode && run.status !== "running")
+    .map((run) => durationSeconds(run))
+    .filter((value): value is number => typeof value === "number" && value > 0);
+  return median(durations) || fallbackEstimateSeconds[mode] || fallbackEstimateSeconds.all;
+}
+
+function staleAdjustedRun(run: RunRow, allRuns: RunRow[]): EstimatedRun {
+  const estimate = estimateForMode(run.mode, allRuns);
+  const staleLimit = Math.max(estimate * 1.75, 90 * 60);
+  if (run.status === "running" && elapsedSeconds(run) > staleLimit) {
+    return {
+      ...run,
+      status: "cancelled",
+      finished_at: run.finished_at || new Date().toISOString(),
+      error: run.error || "Run appears stale after exceeding the expected runtime.",
+      estimate_seconds: estimate
+    };
+  }
+  return { ...run, estimate_seconds: estimate };
 }
 
 export async function GET() {
@@ -49,40 +80,35 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: latest, error: latestError } = await supabase
+  const { data: rawRuns, error } = await supabase
     .from("job_runs")
     .select("id,mode,status,started_at,finished_at,total_found,total_written,total_new,counts_by_source,failures,error")
     .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<RunRow>();
+    .limit(12);
 
-  if (latestError) {
-    return NextResponse.json({ error: latestError.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (!latest) {
+  const runs = (rawRuns || []) as RunRow[];
+  if (!runs.length) {
     return NextResponse.json(
-      { run: null, estimate_seconds: null, generated_at: new Date().toISOString() },
+      { run: null, active_runs: [], estimate_seconds: null, generated_at: new Date().toISOString() },
       { headers: { "Cache-Control": "no-store" } }
     );
   }
 
-  const { data: history } = await supabase
-    .from("job_runs")
-    .select("started_at,finished_at")
-    .eq("mode", latest.mode)
-    .neq("status", "running")
-    .not("finished_at", "is", null)
-    .order("started_at", { ascending: false })
-    .limit(8);
-
-  const durations = (history || [])
-    .map((run) => durationSeconds(run))
-    .filter((value): value is number => typeof value === "number" && value > 0);
-  const estimate = median(durations) || fallbackEstimateSeconds[latest.mode] || fallbackEstimateSeconds.all;
+  const adjusted = runs.map((run) => staleAdjustedRun(run, runs));
+  const activeRuns = adjusted.filter((run) => run.status === "running");
+  const primary = activeRuns[0] || adjusted[0];
 
   return NextResponse.json(
-    { run: latest, estimate_seconds: estimate, generated_at: new Date().toISOString() },
+    {
+      run: primary,
+      active_runs: activeRuns,
+      estimate_seconds: primary.estimate_seconds,
+      generated_at: new Date().toISOString()
+    },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

@@ -119,18 +119,21 @@ function atsLabel(request: CompanyWatchlistRequest) {
   return typeof ats === "string" ? ats : request.status;
 }
 
+type EstimatedRun = JobRun & { estimate_seconds?: number | null };
+
 type RunStatusResponse = {
-  run: JobRun | null;
+  run: EstimatedRun | null;
+  active_runs?: EstimatedRun[];
   estimate_seconds: number | null;
   generated_at: string;
 };
 
 const fallbackEstimateSeconds: Record<string, number> = {
   watchlist: 12 * 60,
-  discovery: 18 * 60,
-  job_search: 20 * 60,
+  discovery: 40 * 60,
+  job_search: 15 * 60,
   source_expansion: 3 * 60,
-  all: 38 * 60
+  all: 65 * 60
 };
 
 function formatDuration(seconds: number | null) {
@@ -195,8 +198,9 @@ function ScraperPanel({ initialRun }: { initialRun: JobRun | null }) {
   }, []);
 
   const run = snapshot.run;
+  const activeRuns = snapshot.active_runs || [];
   const startedAtMs = run?.started_at ? new Date(run.started_at).getTime() : 0;
-  const isRunning = run?.status === "running";
+  const isRunning = activeRuns.length > 0 || run?.status === "running";
   const isQueued = Boolean(
     queuedAt && !isRunning && (!run || !Number.isFinite(startedAtMs) || startedAtMs < queuedAt - 5000)
   );
@@ -214,7 +218,7 @@ function ScraperPanel({ initialRun }: { initialRun: JobRun | null }) {
   }, [isActive, loadStatus]);
 
   useEffect(() => {
-    if (runState.ok && runState.message === "Scraper run started.") {
+    if (runState.ok && runState.message === "Scraper runs started.") {
       setQueuedAt(Date.now());
       void loadStatus();
     }
@@ -226,18 +230,43 @@ function ScraperPanel({ initialRun }: { initialRun: JobRun | null }) {
     }
   }, [queuedAt, run, startedAtMs]);
 
-  const estimate = snapshot.estimate_seconds || (run ? fallbackEstimateSeconds[run.mode] : null) || null;
-  const elapsed = isQueued ? Math.round((now - (queuedAt || now)) / 1000) : runElapsedSeconds(run, now);
-  const remaining = isRunning && estimate && elapsed !== null ? Math.max(0, estimate - elapsed) : null;
+  const activeEstimates = activeRuns.map((activeRun) => activeRun.estimate_seconds || fallbackEstimateSeconds[activeRun.mode] || fallbackEstimateSeconds.all);
+  const activeElapsed = activeRuns.map((activeRun) => runElapsedSeconds(activeRun, now) || 0);
+  const activeRemaining = activeRuns.map((activeRun, index) => Math.max(0, activeEstimates[index] - activeElapsed[index]));
+  const estimate = activeRuns.length
+    ? Math.max(...activeEstimates)
+    : snapshot.estimate_seconds || (run ? fallbackEstimateSeconds[run.mode] : null) || null;
+  const elapsed = isQueued
+    ? Math.round((now - (queuedAt || now)) / 1000)
+    : activeRuns.length
+      ? Math.max(...activeElapsed)
+      : runElapsedSeconds(run, now);
+  const remaining = activeRuns.length
+    ? Math.max(...activeRemaining)
+    : isRunning && estimate && elapsed !== null
+      ? Math.max(0, estimate - elapsed)
+      : null;
   const progress = isQueued
     ? 4
-    : isRunning && estimate && elapsed !== null
-      ? Math.min(96, Math.max(6, Math.round((elapsed / estimate) * 100)))
-      : run
-        ? 100
-        : 0;
+    : activeRuns.length
+      ? Math.min(96, Math.max(6, Math.round(activeRuns.reduce((sum, activeRun, index) => {
+          return sum + Math.min(1, activeElapsed[index] / activeEstimates[index]);
+        }, 0) / activeRuns.length * 100)))
+      : isRunning && estimate && elapsed !== null
+        ? Math.min(96, Math.max(6, Math.round((elapsed / estimate) * 100)))
+        : run
+          ? 100
+          : 0;
   const statusLabel = isQueued ? "Queued" : isRunning ? "Running" : run ? run.status : "Idle";
-  const modeLabel = isQueued ? "All scrapers" : run ? formatMode(run.mode) : "No runs yet";
+  const modeLabel = isQueued
+    ? "All scrapers"
+    : activeRuns.length > 1
+      ? String(activeRuns.length) + " scraper runs"
+      : activeRuns.length === 1
+        ? formatMode(activeRuns[0].mode)
+        : run
+          ? formatMode(run.mode)
+          : "No runs yet";
   const buttonDisabled = runPending || isQueued || isRunning;
 
   return (
@@ -278,7 +307,11 @@ function ScraperPanel({ initialRun }: { initialRun: JobRun | null }) {
           <span>{run.total_written} written | {run.total_found} matched</span>
         </div>
       ) : null}
-      <p className="run-source-summary">{sourceSummary(run)}</p>
+      <p className="run-source-summary">
+        {activeRuns.length
+          ? activeRuns.map((activeRun) => formatMode(activeRun.mode)).join(" running | ") + " running"
+          : sourceSummary(run)}
+      </p>
       {runState.message ? (
         <span className={runState.ok ? "action-message" : "action-message is-error"}>
           {runState.message}
