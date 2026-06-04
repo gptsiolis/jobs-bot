@@ -25,6 +25,16 @@ export type JobRow = {
   sector: string;
   applicability_score: number;
   status: JobStatus;
+  visibility: string;
+  role_family: string;
+  seniority_level: string;
+  compensation_min: number | null;
+  compensation_max: number | null;
+  ai_fit_score: number | null;
+  ai_company_score: number | null;
+  ai_summary: string;
+  ai_reject_reasons: string[];
+  ai_labels: string[];
   description_excerpt: string;
 };
 

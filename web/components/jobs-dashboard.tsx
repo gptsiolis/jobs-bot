@@ -131,6 +131,7 @@ export function JobsDashboard({
   const [sponsor, setSponsor] = useState("");
   const [fit, setFit] = useState("");
   const [location, setLocation] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
   const [runState, runAction, runPending] = useActionState(triggerScraperRun, {
     ok: true,
@@ -149,7 +150,9 @@ export function JobsDashboard({
           ? job.status === "new" || job.status === "saved"
           : !status || job.status === status;
       const text = `${job.title} ${job.company} ${job.location_text}`.toLowerCase();
+      const visibilityMatch = showHidden || job.visibility !== "hidden" || job.status !== "new";
       return (
+        visibilityMatch &&
         activeMatch &&
         (!sponsor || job.sponsor_tier === sponsor) &&
         (!fit || job.fit_bucket === fit) &&
@@ -157,9 +160,10 @@ export function JobsDashboard({
         (!q || text.includes(q))
       );
     });
-  }, [jobs, query, status, sponsor, fit, location]);
+  }, [jobs, query, status, sponsor, fit, location, showHidden]);
 
   const selected = filtered.find((job) => job.job_id === selectedId) || filtered[0] || null;
+  const hiddenCount = jobs.filter((job) => job.visibility === "hidden" && job.status === "new").length;
 
   const grouped = useMemo(() => {
     return filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
@@ -197,6 +201,13 @@ export function JobsDashboard({
               <button className="primary-button" type="submit" disabled={runPending}>
                 <Play size={15} />
                 Discovery
+              </button>
+            </form>
+            <form action={runAction}>
+              <input type="hidden" name="mode" value="job_search" />
+              <button className="primary-button" type="submit" disabled={runPending}>
+                <Play size={15} />
+                Job Search
               </button>
             </form>
           </div>
@@ -300,6 +311,18 @@ export function JobsDashboard({
           </select>
         </label>
       </section>
+
+      <div className="visibility-toggle">
+        <label>
+          <input
+            type="checkbox"
+            checked={showHidden}
+            onChange={(event) => setShowHidden(event.target.checked)}
+          />
+          <span>Show lower-ranked candidates</span>
+        </label>
+        <span className="muted">{hiddenCount} hidden new jobs</span>
+      </div>
 
       <div className="content-grid">
         <section>
@@ -410,6 +433,18 @@ export function JobsDashboard({
                 </dd>
                 <dt>Quality</dt>
                 <dd>{selected.quality_tier}</dd>
+                {selected.role_family ? (
+                  <>
+                    <dt>Role family</dt>
+                    <dd>{selected.role_family}</dd>
+                  </>
+                ) : null}
+                {selected.ai_fit_score !== null ? (
+                  <>
+                    <dt>AI fit</dt>
+                    <dd>{selected.ai_fit_score}</dd>
+                  </>
+                ) : null}
                 <dt>First seen</dt>
                 <dd>{formatDate(selected.first_seen_at)}</dd>
                 <dt>Last seen</dt>
@@ -419,6 +454,12 @@ export function JobsDashboard({
                 <a className="primary-button" href={selected.apply_url} target="_blank" rel="noreferrer">
                   Apply <ExternalLink size={15} />
                 </a>
+              ) : null}
+              {selected.ai_summary ? (
+                <p className="excerpt">{selected.ai_summary}</p>
+              ) : null}
+              {selected.ai_reject_reasons.length ? (
+                <p className="excerpt">Watchouts: {selected.ai_reject_reasons.join(", ")}</p>
               ) : null}
               {selected.description_excerpt ? (
                 <p className="excerpt">{selected.description_excerpt}</p>

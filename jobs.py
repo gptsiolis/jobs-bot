@@ -21,15 +21,17 @@ from company_registry import (
 )
 from scrapers import (
     getro, consider, yc, wellfound, greenhouse, lever, ashby, workday,
-    workable, smartrecruiters, dayforce, board_resolver,
+    workable, smartrecruiters, dayforce, board_resolver, job_search,
 )
 from scrapers.filters import FIT_BUCKET_LABELS, add_fit_metadata
 from storage import SupabaseJobStore, counts_by_source, normalize_job_record
+import ai_ranker
+import company_leads
 
 SEEN_JOBS_FILE = "seen_jobs.json"
 SEEN_TTL_DAYS = 60
 
-MODES = ("discovery", "watchlist", "all", "test", "sync")
+MODES = ("discovery", "watchlist", "job_search", "source_expansion", "all", "test", "sync")
 
 FIT_BUCKET_ORDER = ("strong", "possible", "unknown")
 
@@ -402,6 +404,18 @@ def run_watchlist(seen):
     )
 
 
+def collect_job_search_jobs():
+    jobs = job_search.scrape()
+    return _prepare_jobs(jobs)
+
+def run_source_expansion(store):
+    if not store:
+        return []
+    _load_dynamic_company_boards(store=store)
+    company_leads.promote_company_leads(store)
+    return []
+
+
 _ATS_TO_MODULE = {
     "greenhouse": greenhouse,
     "lever": lever,
@@ -425,29 +439,37 @@ def collect_jobs_for_mode(mode, store=None):
         return collect_watchlist_jobs(store=store)
     if mode == "discovery":
         return collect_discovery_jobs()
+    if mode == "job_search":
+        return collect_job_search_jobs()
+    if mode == "source_expansion":
+        return run_source_expansion(store)
     if mode == "all":
         jobs = []
         jobs.extend(collect_discovery_jobs())
         jobs.extend(collect_watchlist_jobs(store=store))
+        jobs.extend(collect_job_search_jobs())
         return jobs
-    raise ValueError(f"Unknown sync mode: {mode!r}")
-
+    raise ValueError("Unknown sync mode: " + repr(mode))
 
 def run_sync(mode, dry_run=False):
-    if mode not in ("watchlist", "discovery", "all"):
-        print("Usage: python jobs.py sync [watchlist|discovery|all] [--dry-run]")
+    if mode not in ("watchlist", "discovery", "job_search", "source_expansion", "all"):
+        print("Usage: python jobs.py sync [watchlist|discovery|job_search|source_expansion|all] [--dry-run]")
         sys.exit(2)
 
     store = None if dry_run else SupabaseJobStore()
     run_id = None
     jobs = []
     result = {"total_written": 0, "total_new": 0}
+    ai_result = {"enabled": False, "ranked": 0, "errors": []}
+    company_leads_recorded = 0
+    company_leads_promoted = 0
     archived_stale = 0
     rejected_stale = 0
     try:
         if store:
             run_id = store.create_run(mode)
         jobs = collect_jobs_for_mode(mode, store=store)
+        ai_result = ai_ranker.rank_jobs(jobs)
         source_counts = counts_by_source(jobs)
         if dry_run:
             normalized = [normalize_job_record(job) for job in jobs if job.get("job_id")]
@@ -459,6 +481,9 @@ def run_sync(mode, dry_run=False):
             }
         else:
             result = store.upsert_jobs(jobs)
+            if mode in ("job_search", "all"):
+                company_leads_recorded = company_leads.record_company_leads(store, jobs)
+                company_leads_promoted = company_leads.promote_company_leads(store)
             if mode == "watchlist":
                 archived_stale = store.archive_unmatched_new_jobs(
                     [job["job_id"] for job in jobs if job.get("job_id")]
@@ -472,7 +497,7 @@ def run_sync(mode, dry_run=False):
                 total_written=result["total_written"],
                 total_new=result["total_new"],
                 counts=source_counts,
-                failures=_scraper_failures(),
+                failures=_scraper_failures() + ([{"component": "ai_ranker", "errors": ai_result.get("errors", [])}] if ai_result.get("errors") else []),
             )
         suffix = " (dry run)" if dry_run else ""
         print(
@@ -483,6 +508,10 @@ def run_sync(mode, dry_run=False):
             print(f"[Sync] Archived {archived_stale} unmatched new watchlist jobs.")
         if rejected_stale:
             print(f"[Sync] Rejected {rejected_stale} applied jobs older than 60 days.")
+        if ai_result.get("ranked"):
+            print(f"[Sync] AI ranked {ai_result['ranked']} jobs.")
+        if company_leads_recorded or company_leads_promoted:
+            print(f"[Sync] Recorded {company_leads_recorded} company leads; promoted {company_leads_promoted}.")
     except Exception as exc:
         if store and run_id:
             store.finish_run(
@@ -492,7 +521,7 @@ def run_sync(mode, dry_run=False):
                 total_written=result.get("total_written", 0),
                 total_new=result.get("total_new", 0),
                 counts=counts_by_source(jobs),
-                failures=_scraper_failures(),
+                failures=_scraper_failures() + ([{"component": "ai_ranker", "errors": ai_result.get("errors", [])}] if ai_result.get("errors") else []),
                 error=str(exc),
             )
         raise

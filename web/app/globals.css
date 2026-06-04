@@ -513,3 +513,18 @@ tbody tr.is-selected:hover {
 .button-row .primary-button {
   width: 100%;
 }
+
+.visibility-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.visibility-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}

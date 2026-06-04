@@ -11,10 +11,14 @@ on:
         options:
           - watchlist
           - discovery
+          - job_search
+          - source_expansion
           - all
   schedule:
     - cron: "0 19 * * *"
     - cron: "40 19 * * *"
+    - cron: "20 20 * * *"
+    - cron: "0 21 * * 0"
 
 jobs:
   scrape:
@@ -26,6 +30,13 @@ jobs:
       SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
       SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
       RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+      SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+      JOB_SEARCH_DAILY_REQUEST_LIMIT: ${{ vars.JOB_SEARCH_DAILY_REQUEST_LIMIT }}
+      AI_RANKING_ENABLED: ${{ vars.AI_RANKING_ENABLED }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      AI_BATCH_SIZE: ${{ vars.AI_BATCH_SIZE }}
+      AI_DAILY_JOB_LIMIT: ${{ vars.AI_DAILY_JOB_LIMIT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +58,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 21 * * 0" ]; then
+            echo "mode=source_expansion" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "20 20 * * *" ]; then
+            echo "mode=job_search" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.schedule }}" = "40 19 * * *" ]; then
             echo "mode=discovery" >> "$GITHUB_OUTPUT"
           else

@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 import requests
 
+
 JOB_STATUSES = (
     "new",
     "saved",
@@ -22,6 +23,7 @@ JOB_STATUSES = (
     "dismissed",
     "archived",
 )
+JOB_VISIBILITIES = ("default", "hidden", "needs_review")
 WATCHLIST_SOURCE_PREFIXES = (
     "greenhouse:",
     "lever:",
@@ -63,6 +65,15 @@ def clean_text(value):
     text = re.sub(r"&nbsp;|&#160;", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def _int_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def job_location_string(job):
@@ -130,7 +141,26 @@ def calculate_applicability_score(job):
     if sponsor_tier == "unknown_no_ban":
         score -= 3
 
+    ai_fit_score = _int_or_none(job.get("ai_fit_score"))
+    if ai_fit_score is not None:
+        score = int(round((score * 0.65) + (max(0, min(100, ai_fit_score)) * 0.35)))
+
+    ai_company_score = _int_or_none(job.get("ai_company_score"))
+    if ai_company_score is not None:
+        score += int(round((max(0, min(100, ai_company_score)) - 50) / 10))
+
     return max(0, min(100, score))
+
+
+def job_visibility(job):
+    explicit = job.get("visibility")
+    if explicit in JOB_VISIBILITIES:
+        return explicit
+    if job.get("fit_bucket") == "reject":
+        return "hidden"
+    if calculate_applicability_score(job) < 55:
+        return "hidden"
+    return "default"
 
 
 def normalize_job_record(job, now=None, status="new"):
@@ -155,6 +185,17 @@ def normalize_job_record(job, now=None, status="new"):
         "sector": job.get("sector") or "unknown",
         "applicability_score": calculate_applicability_score(job),
         "status": status,
+        "visibility": job_visibility(job),
+        "role_family": job.get("role_family") or "",
+        "seniority_level": job.get("seniority_level") or "",
+        "compensation_min": _int_or_none(job.get("compensation_min")),
+        "compensation_max": _int_or_none(job.get("compensation_max")),
+        "ai_fit_score": _int_or_none(job.get("ai_fit_score")),
+        "ai_company_score": _int_or_none(job.get("ai_company_score")),
+        "ai_summary": clean_text(job.get("ai_summary", "")),
+        "ai_reject_reasons": list(job.get("ai_reject_reasons") or []),
+        "ai_labels": list(job.get("ai_labels") or []),
+        "ranking_version": job.get("ranking_version") or "deterministic-v2",
         "description_excerpt": description[:1200],
         "raw_payload": raw_payload,
     }
@@ -180,6 +221,17 @@ def migrated_seen_record(job_id, now=None):
         "sector": "legacy",
         "applicability_score": 0,
         "status": "archived",
+        "visibility": "hidden",
+        "role_family": "",
+        "seniority_level": "",
+        "compensation_min": None,
+        "compensation_max": None,
+        "ai_fit_score": None,
+        "ai_company_score": None,
+        "ai_summary": "",
+        "ai_reject_reasons": [],
+        "ai_labels": [],
+        "ranking_version": "legacy",
         "description_excerpt": "",
         "raw_payload": {"migrated_from": "seen_jobs.json", "legacy_job_id": job_id},
     }

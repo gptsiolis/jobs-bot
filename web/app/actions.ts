@@ -67,8 +67,8 @@ export async function triggerScraperRun(
   await requireUser();
 
   const mode = String(formData.get("mode") || "");
-  if (!["watchlist", "discovery"].includes(mode)) {
-    return { ok: false, message: "Choose watchlist or discovery." };
+  if (!["watchlist", "discovery", "job_search"].includes(mode)) {
+    return { ok: false, message: "Choose watchlist, discovery, or job search." };
   }
 
   const token = process.env.GITHUB_ACTIONS_TOKEN;
