@@ -47,7 +47,9 @@ export type JobRun = {
   total_found: number;
   total_written: number;
   total_new: number;
+  counts_by_source?: Record<string, number> | null;
   failures: unknown[];
+  error?: string | null;
 };
 export type CompanyWatchlistRequest = {
   id: string;

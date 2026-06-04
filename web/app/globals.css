@@ -440,6 +440,134 @@ tbody tr.is-selected:hover {
   font-size: 14px;
 }
 
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panel-heading h2 {
+  margin: 0;
+}
+
+.scraper-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.scraper-panel.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(11, 107, 203, 0.18);
+}
+
+.run-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--panel-soft);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.run-state.is-running {
+  color: var(--accent-strong);
+  border-color: rgba(11, 107, 203, 0.35);
+  background: #eef6ff;
+}
+
+.run-state.is-failed {
+  color: var(--bad);
+  border-color: rgba(163, 58, 52, 0.35);
+  background: #fff1ef;
+}
+
+.run-state.is-success {
+  color: var(--good);
+  border-color: rgba(29, 127, 85, 0.35);
+  background: #eefaf4;
+}
+
+.wide-button {
+  width: 100%;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.run-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+}
+
+.run-progress span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  background: var(--accent);
+  transition: width 250ms ease;
+}
+
+.run-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.run-status-grid span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fbfbf8;
+}
+
+.run-status-grid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.run-status-grid small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.run-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.run-result span,
+.run-source-summary {
+  color: var(--muted);
+}
+
+.run-source-summary {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 .button-row,
 .inline-form {
   display: flex;
@@ -500,7 +628,8 @@ tbody tr.is-selected:hover {
     width: 100%;
   }
 
-  .request-row {
+  .request-row,
+  .run-status-grid {
     grid-template-columns: 1fr;
   }
 }

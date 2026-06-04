@@ -37,7 +37,7 @@ export default async function HomePage() {
       .limit(1000),
     supabase
       .from("job_runs")
-      .select("id,mode,status,started_at,finished_at,total_found,total_written,total_new,failures")
+      .select("id,mode,status,started_at,finished_at,total_found,total_written,total_new,counts_by_source,failures,error")
       .order("started_at", { ascending: false })
       .limit(5),
     supabase
@@ -82,6 +82,7 @@ export default async function HomePage() {
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}
           companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
+          latestRun={latestRun}
         />
       </main>
     </div>
