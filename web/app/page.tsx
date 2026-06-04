@@ -43,6 +43,7 @@ export default async function HomePage() {
     supabase
       .from("company_watchlist_requests")
       .select("id,company_name,normalized_name,status,ats_config,last_checked_at,last_error,created_at")
+      .in("status", ["pending", "resolved", "unresolved"])
       .order("created_at", { ascending: false })
       .limit(8)
   ]);
