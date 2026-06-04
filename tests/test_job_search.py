@@ -85,6 +85,8 @@ class JobSearchTests(unittest.TestCase):
         self.assertEqual(len(jobs), 1)
         self.assertEqual(len(session.calls), 1)
         self.assertEqual(session.calls[0][1]["engine"], "google_jobs")
+        self.assertNotIn("location", session.calls[0][1])
+        self.assertIn("remote", session.calls[0][1]["q"])
 
     def test_real_estate_investment_role_is_hidden(self):
         raw = {

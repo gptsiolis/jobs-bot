@@ -75,9 +75,32 @@ def _search_locations():
     return [q.strip() for q in configured.split(";") if q.strip()]
 
 
+def _serpapi_params(query, location, api_key):
+    params = {
+        "engine": "google_jobs",
+        "q": query,
+        "google_domain": "google.com",
+        "gl": "us",
+        "hl": "en",
+        "api_key": api_key,
+    }
+    if location.lower() == "remote":
+        params["q"] = f"{query} remote"
+    else:
+        params["location"] = location
+    return params
+
+
 def _fetch(params, session):
     response = session.get(SERPAPI_ENDPOINT, params=params, timeout=30)
-    response.raise_for_status()
+    status_code = getattr(response, "status_code", 200)
+    if status_code >= 400:
+        detail = response.text[:300] if getattr(response, "text", None) else ""
+        raise requests.HTTPError(
+            f"SerpApi {status_code} for q={params.get( q)!r} "
+            f"location={params.get(location)!r}: {detail}",
+            response=response,
+        )
     return response.json()
 
 
@@ -201,19 +224,16 @@ def scrape(api_key=None, session=None):
                 if requests_used >= request_limit:
                     print(f"  Job search request cap reached ({request_limit}).")
                     return jobs
-                params = {
-                    "engine": "google_jobs",
-                    "q": query,
-                    "location": location,
-                    "google_domain": "google.com",
-                    "gl": "us",
-                    "hl": "en",
-                    "api_key": api_key,
-                }
+                params = _serpapi_params(query, location, api_key)
                 if next_page_token:
                     params["next_page_token"] = next_page_token
                 print(f"  Searching Google Jobs: {query!r} in {location} page {page + 1}")
-                data = _fetch(params, session)
+                try:
+                    data = _fetch(params, session)
+                except requests.RequestException as exc:
+                    requests_used += 1
+                    print(f"  [!] SerpApi search failed: {exc}")
+                    break
                 requests_used += 1
                 for raw in data.get("jobs_results") or []:
                     normalized = normalize_job(raw, query, location)
