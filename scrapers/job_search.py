@@ -24,9 +24,11 @@ JOB_SEARCH_QUERIES = [
     "business operations analyst entry level",
     "strategy operations associate",
     "analyst program business operations",
-    "investment analyst entry level",
-    "acquisitions analyst real estate",
-    "asset management analyst real estate",
+    "crypto investment analyst entry level",
+    "digital assets analyst entry level",
+    "blockchain investment analyst",
+    "art business analyst",
+    "collectibles marketplace analyst",
 ]
 
 JOB_SEARCH_LOCATIONS = [
@@ -123,11 +125,13 @@ def _compensation(description):
     return min(first, second), max(first, second)
 
 
-def _hard_reject_reasons(title, location, description):
+def _hard_reject_reasons(title, location, description, employer_name=""):
     blob = f"{title or ''} {description or ''}".lower()
     reasons = []
     if filters.is_logistics_operations(title, description):
         reasons.append("warehouse/logistics operations")
+    if filters.is_disallowed_investment_role(title, description, employer_name):
+        reasons.append("investment role outside art/collectibles/crypto")
     if filters.compensation_below_floor(description):
         reasons.append("compensation below floor")
     if filters.is_internship(title):
@@ -171,7 +175,7 @@ def normalize_job(job, query, search_location):
         "ranking_version": "deterministic-v2",
     }
     filters.add_fit_metadata(normalized, description)
-    reasons = _hard_reject_reasons(title, location, description)
+    reasons = _hard_reject_reasons(title, location, description, company)
     if reasons:
         normalized["fit_bucket"] = "reject"
         normalized["fit_reasons"] = list(dict.fromkeys((normalized.get("fit_reasons") or []) + reasons))

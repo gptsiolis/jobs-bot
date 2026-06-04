@@ -179,6 +179,41 @@ ENTRY_LEVEL_TITLE_TEXT = [
     "representative",
 ]
 
+INVESTMENT_ROLE_TEXT = [
+    "investment analyst",
+    "investment associate",
+    "acquisitions analyst",
+    "acquisitions associate",
+    "asset management analyst",
+    "asset management associate",
+    "portfolio analyst",
+    "capital markets analyst",
+]
+
+ALLOWED_INVESTMENT_DOMAIN_TEXT = [
+    "art",
+    "auction",
+    "auction house",
+    "gallery",
+    "collectible",
+    "collectibles",
+    "trading card",
+    "sports card",
+    "memorabilia",
+    "sotheby",
+    "christie",
+    "crypto",
+    "cryptocurrency",
+    "digital asset",
+    "digital assets",
+    "blockchain",
+    "web3",
+    "defi",
+    "token",
+    "tokens",
+    "nft",
+]
+
 
 def is_excluded_seniority(title):
     t = (title or "").lower()
@@ -238,6 +273,12 @@ def is_excluded_keyword(title):
 def is_logistics_operations(title, description=""):
     blob = f"{title or ''} {description or ''}".lower()
     return any(phrase in blob for phrase in LOGISTICS_OPERATIONS_TEXT)
+
+def is_disallowed_investment_role(title, description="", employer_name=""):
+    blob = ((title or "") + " " + (description or "") + " " + (employer_name or "")).lower()
+    if not any(phrase in blob for phrase in INVESTMENT_ROLE_TEXT):
+        return False
+    return not any(phrase in blob for phrase in ALLOWED_INVESTMENT_DOMAIN_TEXT)
 
 
 def _normalize_text(text):
@@ -437,6 +478,8 @@ def passes_discovery(title, location_blob, employer_name, description=""):
         return False
     if is_logistics_operations(title, description):
         return False
+    if is_disallowed_investment_role(title, description, employer_name):
+        return False
     if compensation_below_floor(description):
         return False
     if is_internship(title):
@@ -464,6 +507,8 @@ def passes_watchlist(title, location_blob, employer_name, description=""):
     if is_excluded_keyword(title):
         return False
     if is_logistics_operations(title, description):
+        return False
+    if is_disallowed_investment_role(title, description, employer_name):
         return False
     if compensation_below_floor(description):
         return False

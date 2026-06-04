@@ -86,6 +86,22 @@ class JobSearchTests(unittest.TestCase):
         self.assertEqual(len(session.calls), 1)
         self.assertEqual(session.calls[0][1]["engine"], "google_jobs")
 
+    def test_real_estate_investment_role_is_hidden(self):
+        raw = {
+            "job_id": "re-investment",
+            "title": "Investment Analyst",
+            "company_name": "RealEstateCo",
+            "location": "New York, NY",
+            "description": "Analyze real estate acquisitions and investment opportunities.",
+        }
+
+        job = job_search.normalize_job(raw, "investment analyst", "New York, NY")
+        record = normalize_job_record(job)
+
+        self.assertEqual(job["fit_bucket"], "reject")
+        self.assertEqual(record["visibility"], "hidden")
+        self.assertIn("investment role outside art/collectibles/crypto", record["fit_reasons"])
+
 
 if __name__ == "__main__":
     unittest.main()

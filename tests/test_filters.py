@@ -188,6 +188,40 @@ class FilterTests(unittest.TestCase):
         self.assertTrue(job["sponsor_eligible"])
         self.assertIn("OPT/STEM OPT friendly", job["sponsor_reasons"])
 
+    def test_investment_roles_must_be_art_collectibles_or_crypto(self):
+        self.assertFalse(
+            filters.passes_watchlist(
+                "Investment Analyst",
+                "New York, NY",
+                "RealEstateCo",
+                "Analyze real estate acquisitions and property investment opportunities.",
+            )
+        )
+        self.assertFalse(
+            filters.passes_watchlist(
+                "Asset Management Analyst",
+                "New York, NY",
+                "RealEstateCo",
+                "Support real estate portfolio operations.",
+            )
+        )
+        self.assertTrue(
+            filters.passes_watchlist(
+                "Crypto Investment Analyst",
+                "New York, NY",
+                "ExampleCo",
+                "Analyze digital assets, blockchain markets, and token investments.",
+            )
+        )
+        self.assertTrue(
+            filters.passes_watchlist(
+                "Investment Analyst",
+                "New York, NY",
+                "Sothebys",
+                "Analyze art and collectibles markets.",
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
