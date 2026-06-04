@@ -187,27 +187,13 @@ export function JobsDashboard({
     <>
       <section className="controls-grid">
         <div className="control-panel">
-          <h2>Scrapers</h2>
+          <h2>Scraper</h2>
           <div className="button-row">
             <form action={runAction}>
-              <input type="hidden" name="mode" value="watchlist" />
+              <input type="hidden" name="mode" value="all" />
               <button className="primary-button" type="submit" disabled={runPending}>
                 <Play size={15} />
-                Watchlist
-              </button>
-            </form>
-            <form action={runAction}>
-              <input type="hidden" name="mode" value="discovery" />
-              <button className="primary-button" type="submit" disabled={runPending}>
-                <Play size={15} />
-                Discovery
-              </button>
-            </form>
-            <form action={runAction}>
-              <input type="hidden" name="mode" value="job_search" />
-              <button className="primary-button" type="submit" disabled={runPending}>
-                <Play size={15} />
-                Job Search
+                Run All Scrapers
               </button>
             </form>
           </div>

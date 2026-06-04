@@ -67,8 +67,8 @@ export async function triggerScraperRun(
   await requireUser();
 
   const mode = String(formData.get("mode") || "");
-  if (!["watchlist", "discovery", "job_search"].includes(mode)) {
-    return { ok: false, message: "Choose watchlist, discovery, or job search." };
+  if (!["all"].includes(mode)) {
+    return { ok: false, message: "Choose the combined scraper run." };
   }
 
   const token = process.env.GITHUB_ACTIONS_TOKEN;
@@ -105,7 +105,7 @@ export async function triggerScraperRun(
   }
 
   revalidatePath("/");
-  return { ok: true, message: `${mode} run started.` };
+  return { ok: true, message: "Scraper run started." };
 }
 
 export async function addCompanyWatchlistRequest(
