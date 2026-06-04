@@ -5,6 +5,7 @@ import re
 
 import requests
 
+from company_registry import metadata_for_company, normalize_company_name
 from . import filters
 
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
@@ -13,17 +14,17 @@ RESULTS_PER_QUERY_PAGE = 10
 MAX_PAGES_PER_QUERY = 2
 
 JOB_SEARCH_QUERIES = [
-    "entry level business development associate",
-    "business development analyst",
-    "business development representative entry level",
-    "entry level sales development representative",
-    "partnerships associate",
-    "partnerships analyst",
-    "growth associate",
-    "growth analyst",
-    "business operations analyst entry level",
-    "strategy operations associate",
-    "analyst program business operations",
+    "entry level business development associate tech",
+    "business development analyst SaaS entry level",
+    "business development representative software entry level",
+    "entry level sales development representative tech company",
+    "partnerships associate technology company",
+    "partnerships analyst SaaS",
+    "growth associate startup",
+    "growth analyst tech company",
+    "business operations analyst entry level tech",
+    "strategy operations associate software company",
+    "new grad business operations analyst tech",
     "crypto investment analyst entry level",
     "digital assets analyst entry level",
     "blockchain investment analyst",
@@ -51,6 +52,67 @@ SENIOR_HARD_BLOCKS = (
     "vp",
     "head of",
     "manager",
+)
+
+EARLY_CAREER_TITLE_TEXT = (
+    "associate",
+    "analyst",
+    "representative",
+    "coordinator",
+    "specialist",
+    "new grad",
+    "entry level",
+    "entry-level",
+    "early career",
+    "rotational",
+    "development program",
+)
+
+TECH_DOMAIN_TEXT = (
+    "software",
+    "saas",
+    "artificial intelligence",
+    " ai ",
+    "machine learning",
+    "data platform",
+    "cloud",
+    "cybersecurity",
+    "fintech",
+    "payments",
+    "crypto",
+    "cryptocurrency",
+    "digital asset",
+    "digital assets",
+    "blockchain",
+    "web3",
+    "marketplace",
+    "consumer tech",
+    "startup",
+    "developer tools",
+    "enterprise technology",
+    "enterprise software",
+)
+
+LOW_QUALITY_BROAD_TEXT = (
+    "staffing",
+    "recruiting agency",
+    "recruitment agency",
+    "temp agency",
+    "talent solutions",
+    "franchise",
+    "retail store",
+    "restaurant",
+    "hospitality",
+    "warehouse",
+    "distribution center",
+    "fulfillment center",
+    "logistics",
+    "supply chain",
+    "manufacturing",
+    "federal credit union",
+    "city and county",
+    "county of",
+    "government",
 )
 
 
@@ -97,8 +159,8 @@ def _fetch(params, session):
     if status_code >= 400:
         detail = response.text[:300] if getattr(response, "text", None) else ""
         raise requests.HTTPError(
-            f"SerpApi {status_code} for q={params.get( q)!r} "
-            f"location={params.get(location)!r}: {detail}",
+            f"SerpApi {status_code} for q={params.get('q')!r} "
+            f"location={params.get('location')!r}: {detail}",
             response=response,
         )
     return response.json()
@@ -148,8 +210,42 @@ def _compensation(description):
     return min(first, second), max(first, second)
 
 
+def _blob(*parts):
+    return " ".join(part or "" for part in parts).lower()
+
+
+def _known_registry_company(company):
+    return metadata_for_company(company).get("sector") != "unknown"
+
+
+def _has_tech_signal(title, company, description):
+    if _known_registry_company(company):
+        return True
+    padded = f" {_blob(title, company, description)} "
+    return any(token in padded for token in TECH_DOMAIN_TEXT)
+
+
+def _has_early_career_title(title):
+    normalized = (title or "").lower()
+    return any(token in normalized for token in EARLY_CAREER_TITLE_TEXT)
+
+
+def _has_low_quality_broad_signal(company, description):
+    blob = _blob(company, description)
+    return any(token in blob for token in LOW_QUALITY_BROAD_TEXT)
+
+
+def _identity_key(job):
+    company = normalize_company_name(job.get("employer_name") or "")
+    title = re.sub(r"[^a-z0-9]+", " ", (job.get("job_title") or "").lower())
+    title = re.sub(r"\b(remote|hybrid|entry level|entry-level|new grad)\b", " ", title)
+    title = re.sub(r"\s+", " ", title).strip()
+    location = re.sub(r"[^a-z0-9]+", " ", " ".join(job.get("locations") or []).lower()).strip()
+    return company, title, location
+
+
 def _hard_reject_reasons(title, location, description, employer_name=""):
-    blob = f"{title or ''} {description or ''}".lower()
+    blob = _blob(title, description)
     reasons = []
     if filters.is_logistics_operations(title, description):
         reasons.append("warehouse/logistics operations")
@@ -167,6 +263,12 @@ def _hard_reject_reasons(title, location, description, employer_name=""):
         reasons.append("sponsorship or work authorization block")
     if "contract" in blob and "full time" not in blob and "full-time" not in blob:
         reasons.append("contract role")
+    if not _has_early_career_title(title):
+        reasons.append("missing early-career title signal")
+    if _has_low_quality_broad_signal(employer_name, description):
+        reasons.append("low-quality broad-search source")
+    if not _has_tech_signal(title, employer_name, description):
+        reasons.append("missing tech company/domain signal")
     return reasons
 
 
@@ -237,9 +339,11 @@ def scrape(api_key=None, session=None):
                 requests_used += 1
                 for raw in data.get("jobs_results") or []:
                     normalized = normalize_job(raw, query, location)
-                    if normalized["job_id"] in seen:
+                    identity = _identity_key(normalized)
+                    if normalized["job_id"] in seen or identity in seen:
                         continue
                     seen.add(normalized["job_id"])
+                    seen.add(identity)
                     jobs.append(normalized)
                 pagination = data.get("serpapi_pagination") or {}
                 next_page_token = pagination.get("next_page_token")

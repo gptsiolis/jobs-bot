@@ -29,13 +29,22 @@ class FakeSession:
 
 
 class JobSearchTests(unittest.TestCase):
+    def setUp(self):
+        self._old_limit = os.environ.get("JOB_SEARCH_DAILY_REQUEST_LIMIT")
+
+    def tearDown(self):
+        if self._old_limit is None:
+            os.environ.pop("JOB_SEARCH_DAILY_REQUEST_LIMIT", None)
+        else:
+            os.environ["JOB_SEARCH_DAILY_REQUEST_LIMIT"] = self._old_limit
+
     def test_normalizes_serpapi_job(self):
         raw = {
             "job_id": "abc123",
             "title": "Business Development Analyst",
             "company_name": "ExampleCo",
             "location": "New York, NY",
-            "description": "Entry level role with salary $75,000 - $85,000 per year.",
+            "description": "Entry level role at a SaaS software company with salary $75,000 - $85,000 per year.",
             "apply_options": [{"link": "https://example.com/job"}],
         }
 
@@ -73,7 +82,7 @@ class JobSearchTests(unittest.TestCase):
                     "title": "Partnerships Associate",
                     "company_name": "ExampleCo",
                     "location": "Remote",
-                    "description": "Entry level partnerships role.",
+                    "description": "Entry level partnerships role for a SaaS software startup.",
                 }
             ],
             "serpapi_pagination": {"next_page_token": "next"},
@@ -87,6 +96,66 @@ class JobSearchTests(unittest.TestCase):
         self.assertEqual(session.calls[0][1]["engine"], "google_jobs")
         self.assertNotIn("location", session.calls[0][1])
         self.assertIn("remote", session.calls[0][1]["q"])
+
+
+    def test_unknown_non_tech_job_is_hidden(self):
+        raw = {
+            "job_id": "non-tech",
+            "title": "Business Development Analyst",
+            "company_name": "Local Services Co",
+            "location": "New York, NY",
+            "description": "Entry level business development role for a regional services company.",
+        }
+
+        job = job_search.normalize_job(raw, "business development analyst", "New York, NY")
+        record = normalize_job_record(job)
+
+        self.assertEqual(job["fit_bucket"], "reject")
+        self.assertEqual(record["visibility"], "hidden")
+        self.assertIn("missing tech company/domain signal", record["fit_reasons"])
+
+    def test_staffing_or_low_quality_source_is_hidden(self):
+        raw = {
+            "job_id": "staffing",
+            "title": "Sales Development Representative",
+            "company_name": "Example Staffing",
+            "location": "Remote",
+            "description": "Entry level SDR role supporting software clients.",
+        }
+
+        job = job_search.normalize_job(raw, "sales development representative", "Remote")
+        record = normalize_job_record(job)
+
+        self.assertEqual(job["fit_bucket"], "reject")
+        self.assertEqual(record["visibility"], "hidden")
+        self.assertIn("low-quality broad-search source", record["fit_reasons"])
+
+    def test_scrape_deduplicates_company_title_location_variants(self):
+        os.environ["JOB_SEARCH_DAILY_REQUEST_LIMIT"] = "1"
+        payload = {
+            "jobs_results": [
+                {
+                    "job_id": "first-id",
+                    "title": "Business Development Analyst - Remote",
+                    "company_name": "Stripe, Inc.",
+                    "location": "Remote",
+                    "description": "Entry level business development analyst role at a payments software company.",
+                },
+                {
+                    "job_id": "second-id",
+                    "title": "Business Development Analyst",
+                    "company_name": "Stripe",
+                    "location": "Remote",
+                    "description": "Entry level business development analyst role at a payments software company.",
+                },
+            ],
+            "serpapi_pagination": {},
+        }
+        session = FakeSession(payload)
+
+        jobs = job_search.scrape(api_key="test", session=session)
+
+        self.assertEqual(len(jobs), 1)
 
     def test_real_estate_investment_role_is_hidden(self):
         raw = {

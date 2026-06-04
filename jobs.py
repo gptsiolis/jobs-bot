@@ -412,7 +412,7 @@ def run_source_expansion(store):
     if not store:
         return []
     _load_dynamic_company_boards(store=store)
-    company_leads.promote_company_leads(store)
+    print("[Source expansion] Auto-promotion from broad search is disabled; use manual dashboard additions.")
     return []
 
 
@@ -483,7 +483,7 @@ def run_sync(mode, dry_run=False):
             result = store.upsert_jobs(jobs)
             if mode in ("job_search", "all"):
                 company_leads_recorded = company_leads.record_company_leads(store, jobs)
-                company_leads_promoted = company_leads.promote_company_leads(store)
+                company_leads_promoted = 0
             if mode == "watchlist":
                 archived_stale = store.archive_unmatched_new_jobs(
                     [job["job_id"] for job in jobs if job.get("job_id")]
