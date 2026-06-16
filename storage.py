@@ -55,6 +55,24 @@ QUALITY_SCORE = {
 UPSERT_CHUNK_SIZE = 40
 UPSERT_RETRIES = 3
 
+# Operations / strategy / chief-of-staff is the top-priority target: these get
+# a ranking bonus and are never auto-hidden on a low score.
+PRIORITY_TITLE_TERMS = (
+    "chief of staff",
+    "operations",
+    "strategy",
+    "founder's associate",
+    "founders associate",
+    "founder associate",
+)
+
+
+def is_priority_role(job):
+    if job.get("role_family") == "operations_strategy":
+        return True
+    title = (job.get("job_title") or "").lower()
+    return any(term in title for term in PRIORITY_TITLE_TERMS)
+
 
 def utc_now_iso():
     return _dt.datetime.now(_dt.timezone.utc).isoformat()
@@ -119,6 +137,8 @@ def calculate_applicability_score(job):
         score += 8
     if any(word in title for word in ("associate", "analyst", "coordinator", "new grad")):
         score += 10
+    if is_priority_role(job):
+        score += 15
     if any(word in title for word in ("business development", "partnership", "growth")):
         score += 8
     if "remote" in location:
@@ -158,6 +178,8 @@ def job_visibility(job):
         return explicit
     if job.get("fit_bucket") == "reject":
         return "hidden"
+    if is_priority_role(job):
+        return "default"
     if calculate_applicability_score(job) < 55:
         return "hidden"
     return "default"

@@ -371,9 +371,25 @@ def sponsor_eligibility_metadata(text):
     }
 
 
+# Maps a matched role tier to a coarse role family. Used for prioritized
+# ranking/visibility downstream (operations/strategy/chief-of-staff is the
+# user's top target and is surfaced first).
+ROLE_FAMILY_BY_TIER = {
+    1: "operations_strategy",
+    2: "early_career",
+    3: "business_development",
+}
+
+
+def role_family(title):
+    """Coarse role family for a title (or '' if it matches no tier)."""
+    return ROLE_FAMILY_BY_TIER.get(role_tier(title), "")
+
+
 def fit_metadata(title, description=""):
     """Return permissive fit scoring metadata for a title + optional body text."""
     tier = role_tier(title)
+    family = ROLE_FAMILY_BY_TIER.get(tier, "")
     text = _normalize_text(description)
     positive_desc = _has_positive_experience(text)
     negative_desc = _has_negative_experience(text)
@@ -381,11 +397,11 @@ def fit_metadata(title, description=""):
 
     reasons = []
     if tier == 1:
-        reasons.append("new grad title")
+        reasons.append("operations/strategy/chief-of-staff title")
     elif tier == 2:
-        reasons.append("entry-level ops title")
+        reasons.append("early-career title")
     elif tier == 3:
-        reasons.append("ops/strategy title")
+        reasons.append("business development/sales title")
 
     if positive_desc:
         reasons.append("0-1 years mentioned")
@@ -394,50 +410,35 @@ def fit_metadata(title, description=""):
     if compensation_below_floor(text):
         reasons.append("compensation below floor")
 
-    if is_logistics_operations(title, text):
+    def _meta(bucket, extra=None):
         return {
-            "fit_bucket": "reject",
-            "fit_reasons": reasons + ["warehouse/logistics operations"],
+            "fit_bucket": bucket,
+            "fit_reasons": (reasons + (extra or [])) or ["experience too senior"],
             "job_description": text,
-        }
-    if compensation_below_floor(text):
-        return {
-            "fit_bucket": "reject",
-            "fit_reasons": reasons,
-            "job_description": text,
+            "role_family": family,
         }
 
-    early_title = tier in (1, 2)
+    if is_logistics_operations(title, text):
+        return _meta("reject", ["warehouse/logistics operations"])
+    if compensation_below_floor(text):
+        return _meta("reject")
+
+    # An explicit entry-level title word (associate/analyst/coordinator/
+    # representative) counts as early-career even on a tier-3 (BD/sales) role,
+    # so those stay surfaced rather than being rejected/buried.
+    early_title = tier in (1, 2) or entry_level_title
     broad_title = tier == 3
     if broad_title and not positive_desc and not entry_level_title:
-        return {
-            "fit_bucket": "reject",
-            "fit_reasons": reasons + ["broad title without entry-level signal"],
-            "job_description": text,
-        }
+        return _meta("reject", ["broad title without entry-level signal"])
     if negative_desc and not early_title and not positive_desc:
-        return {
-            "fit_bucket": "reject",
-            "fit_reasons": reasons or ["experience too senior"],
-            "job_description": text,
-        }
+        return _meta("reject")
     if negative_desc and early_title:
-        return {
-            "fit_bucket": "possible",
-            "fit_reasons": reasons,
-            "job_description": text,
-        }
+        return _meta("possible")
     if tier in (1, 2) or positive_desc:
-        return {
-            "fit_bucket": "strong",
-            "fit_reasons": reasons,
-            "job_description": text,
-        }
-    return {
-        "fit_bucket": "unknown",
-        "fit_reasons": reasons + ["experience unknown"],
-        "job_description": text,
-    }
+        return _meta("strong")
+    if entry_level_title:
+        return _meta("possible")
+    return _meta("unknown", ["experience unknown"])
 
 
 def add_fit_metadata(job, description=None):

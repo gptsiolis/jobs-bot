@@ -19,20 +19,37 @@ class FilterTests(unittest.TestCase):
         )
         metadata = filters.fit_metadata("New Grad Business Operations Associate")
         self.assertEqual(metadata["fit_bucket"], "strong")
-        self.assertIn("new grad title", metadata["fit_reasons"])
+        self.assertEqual(metadata["role_family"], "operations_strategy")
+        self.assertIn("operations/strategy/chief-of-staff title", metadata["fit_reasons"])
+
+    def test_operations_strategy_is_top_priority_family(self):
+        # The user's priority family: surfaced as strong even with no body text.
+        for title in ["Chief of Staff", "Business Operations Associate", "Strategy & Operations"]:
+            with self.subTest(title=title):
+                metadata = filters.fit_metadata(title)
+                self.assertEqual(metadata["fit_bucket"], "strong")
+                self.assertEqual(metadata["role_family"], "operations_strategy")
 
     def test_entry_level_ops_titles_pass(self):
-        titles = [
+        # Operations / strategy / chief-of-staff (priority family) rank strong.
+        strong_titles = [
             "Operations Associate",
             "Business Operations Analyst",
             "Program Coordinator",
-            "Business Development Representative",
-            "Partnerships Associate",
         ]
-        for title in titles:
+        for title in strong_titles:
             with self.subTest(title=title):
                 self.assertTrue(filters.passes_watchlist(title, "New York, NY", "ExampleCo"))
                 self.assertEqual(filters.fit_metadata(title)["fit_bucket"], "strong")
+        # Business development / partnerships are secondary: still surfaced, ranked possible.
+        secondary_titles = [
+            "Business Development Representative",
+            "Partnerships Associate",
+        ]
+        for title in secondary_titles:
+            with self.subTest(title=title):
+                self.assertTrue(filters.passes_watchlist(title, "New York, NY", "ExampleCo"))
+                self.assertEqual(filters.fit_metadata(title)["fit_bucket"], "possible")
 
     def test_internships_are_excluded(self):
         self.assertFalse(
@@ -50,17 +67,20 @@ class FilterTests(unittest.TestCase):
             )
         )
 
-    def test_sales_only_no_longer_passes_without_early_career_signal(self):
-        self.assertFalse(
+    def test_sales_titles_surface_with_entry_level_signal(self):
+        # Sales is broadened now: SDR carries an entry-level signal
+        # ('representative') and is surfaced.
+        self.assertTrue(
             filters.passes_discovery(
                 "Sales Development Representative",
                 "Remote",
                 "ExampleCo",
             )
         )
-        self.assertTrue(
+        # A bare sales title with no entry-level word or body signal stays out.
+        self.assertFalse(
             filters.passes_discovery(
-                "New Grad Sales Development Representative",
+                "Account Executive",
                 "Remote",
                 "ExampleCo",
             )
@@ -95,18 +115,20 @@ class FilterTests(unittest.TestCase):
         metadata = filters.fit_metadata("Operations Associate", senior_description)
         self.assertEqual(metadata["fit_bucket"], "possible")
 
-    def test_broad_operations_without_entry_level_signal_is_rejected(self):
-        self.assertFalse(
+    def test_generalist_operations_is_surfaced_but_senior_is_dropped(self):
+        # Generalist ops is the priority family now -> surfaced (not rejected).
+        self.assertTrue(
             filters.passes_watchlist(
-                "Product Operations Manager",
+                "Operations Specialist",
                 "Remote",
                 "ExampleCo",
                 "Own cross-functional operational processes.",
             )
         )
+        # Senior ops titles are still dropped by the seniority gate.
         self.assertFalse(
             filters.passes_watchlist(
-                "Operations Specialist",
+                "Product Operations Manager",
                 "Remote",
                 "ExampleCo",
                 "Own cross-functional operational processes.",

@@ -33,6 +33,19 @@ GETRO_BOARDS = {
     "Scale Venture Partners": "https://jobs.scalevp.com",
     "Madrona Ventures": "https://jobs.madrona.com",
     "SignalFire": "https://jobs.signalfire.com",
+    # Added from the catalogued-but-unwired set. URLs follow the standard
+    # Getro jobs.<domain> pattern and are unverified — a wrong host just
+    # yields zero jobs (scrape_board skips dead boards), no run failure.
+    "Ribbit Capital": "https://jobs.ribbitcap.com",
+    "Tiger Global": "https://jobs.tigerglobal.com",
+    "Coatue": "https://jobs.coatue.com",
+    "Altimeter Capital": "https://jobs.altimeter.com",
+    "Greenoaks": "https://jobs.greenoaks.com",
+    "Spark Capital": "https://jobs.sparkcapital.com",
+    "Flybridge": "https://jobs.flybridge.com",
+    "Boldstart Ventures": "https://jobs.boldstart.vc",
+    "Work-Bench": "https://jobs.work-bench.com",
+    "Addition": "https://jobs.addition.com",
 }
 
 # ── Consider-powered VC portfolio job boards ───────────────────
@@ -60,6 +73,14 @@ CONSIDER_BOARDS = {
     "QED Investors": "https://careers.qedinvestors.com",
     "Costanoa Ventures": "https://jobs.costanoa.vc",
     "GV": "https://jobs.gv.com",
+    # Added from the catalogued-but-unwired set. Unverified URLs (standard
+    # Consider pattern); scrape_board catches a failed page load and skips.
+    "ICONIQ Growth": "https://jobs.iconiqcapital.com",
+    "Founders Fund": "https://jobs.foundersfund.com",
+    "Atlas Venture": "https://jobs.atlasventure.com",
+    "Bowery Capital": "https://jobs.bowerycap.com",
+    "Primary Venture Partners": "https://jobs.primary.vc",
+    "Homebrew": "https://jobs.homebrew.co",
 }
 
 # ── Role tiers ──────────────────────────────────────────────────
@@ -68,7 +89,34 @@ CONSIDER_BOARDS = {
 # (1 = highest). Precedence is top-down: tier 1 keywords are checked
 # first, so e.g. "New Grad Business Operations" matches tier 1.
 ROLE_TIERS = {
-    1: [  # Early career / new grad business roles
+    1: [  # PRIORITY — operations / strategy / chief of staff (generalist startup roles)
+        "chief of staff",
+        "founder's associate",
+        "founders associate",
+        "founder associate",
+        "business operations",
+        "business operations associate",
+        "business operations analyst",
+        "business operations coordinator",
+        "operations associate",
+        "operations analyst",
+        "operations coordinator",
+        "strategy and operations",
+        "strategy & operations",
+        "strategy operations",
+        "strategy associate",
+        "strategy analyst",
+        "revenue operations",
+        "revenue operations associate",
+        "revenue operations analyst",
+        "special projects associate",
+        "special projects",
+        "program associate",
+        "program coordinator",
+        "operations",
+        "strategy",
+    ],
+    2: [  # Early career / new grad signals (function-agnostic)
         "new grad",
         "new graduate",
         "recent graduate",
@@ -80,18 +128,15 @@ ROLE_TIERS = {
         "analyst program",
         "associate program",
     ],
-    2: [  # Entry-level operations roles
-        "operations associate",
-        "operations analyst",
-        "operations coordinator",
-        "business operations associate",
-        "business operations analyst",
-        "strategy & operations associate",
-        "strategy and operations associate",
-        "strategy operations associate",
+    3: [  # Business development / partnerships / growth / sales / investment
         "business development associate",
         "business development analyst",
         "business development representative",
+        "sales development representative",
+        "account executive",
+        "sales associate",
+        "sales representative",
+        "customer success associate",
         "partnerships associate",
         "partnerships analyst",
         "partner development associate",
@@ -104,18 +149,9 @@ ROLE_TIERS = {
         "acquisitions - analyst",
         "asset management analyst",
         "asset management associate",
-        "program coordinator",
-        "special projects associate",
-    ],
-    3: [  # Broader ops / strategy fallback
-        "chief of staff",
-        "operations",
-        "business operations",
         "business development",
         "partnerships",
         "growth",
-        "strategy",
-        "special projects",
     ],
 }
 

@@ -4,6 +4,7 @@ from storage import (
     SupabaseJobStore,
     calculate_applicability_score,
     counts_by_source,
+    job_visibility,
     migrated_seen_record,
     normalize_job_record,
 )
@@ -56,6 +57,43 @@ class StorageTests(unittest.TestCase):
             calculate_applicability_score(strong),
             calculate_applicability_score(unknown),
         )
+
+    def test_operations_strategy_outranks_business_development(self):
+        ops = {
+            "job_title": "Business Operations Associate",
+            "locations": ["New York, NY"],
+            "fit_bucket": "strong",
+            "role_family": "operations_strategy",
+            "sponsor_tier": "unknown_no_ban",
+            "quality_tier": "acceptable",
+        }
+        bd = {
+            "job_title": "Business Development Associate",
+            "locations": ["New York, NY"],
+            "fit_bucket": "possible",
+            "role_family": "business_development",
+            "sponsor_tier": "unknown_no_ban",
+            "quality_tier": "acceptable",
+        }
+        self.assertGreater(
+            calculate_applicability_score(ops),
+            calculate_applicability_score(bd),
+        )
+
+    def test_priority_role_is_never_auto_hidden(self):
+        # A chief-of-staff role asking for 2+ years scores low but stays visible.
+        stretch_cos = {
+            "job_title": "Chief of Staff",
+            "job_description": "Requires 5+ years of operating experience.",
+            "locations": ["Remote"],
+            "fit_bucket": "possible",
+            "role_family": "operations_strategy",
+            "fit_reasons": ["2+ years mentioned"],
+            "sponsor_tier": "unknown_no_ban",
+            "quality_tier": "acceptable",
+        }
+        self.assertLess(calculate_applicability_score(stretch_cos), 55)
+        self.assertEqual(job_visibility(stretch_cos), "default")
 
     def test_normalize_job_record_maps_scraper_shape_to_database_shape(self):
         record = normalize_job_record(
