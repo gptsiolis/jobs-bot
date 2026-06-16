@@ -1,9 +1,9 @@
-"""Optional Claude-powered attainability ranking for job candidates.
+"""Optional OpenAI-powered attainability ranking for job candidates.
 
-Judges each job for an entry-level candidate, personalized by the user's own
+Judges each job for an early-career candidate, personalized by the user's own
 applied/dismissed history, and can hide roles it deems out of reach. Gated by
-AI_RANKING_ENABLED + ANTHROPIC_API_KEY; falls back to deterministic scoring
-when disabled or on any error.
+AI_RANKING_ENABLED + OPENAI_API_KEY; falls back to deterministic scoring when
+disabled or on any error.
 """
 
 import json
@@ -13,7 +13,8 @@ import requests
 
 from scrapers import filters
 
-DEFAULT_MODEL = "claude-haiku-4-5"
+OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"
+DEFAULT_MODEL = "gpt-4.1-mini"
 DEFAULT_BATCH_SIZE = 12
 EXAMPLE_LIMIT = 25
 
@@ -21,10 +22,6 @@ EXAMPLE_LIMIT = 25
 # Override per-run with the CANDIDATE_EXPERIENCE env var rather than editing
 # this prompt.
 DEFAULT_EXPERIENCE = "a candidate with new-grad to roughly 2 years of full-time experience"
-
-
-def _experience_profile():
-    return os.getenv("CANDIDATE_EXPERIENCE", "").strip() or DEFAULT_EXPERIENCE
 
 RANKING_SCHEMA = {
     "type": "object",
@@ -56,9 +53,13 @@ RANKING_SCHEMA = {
 }
 
 
+def _experience_profile():
+    return os.getenv("CANDIDATE_EXPERIENCE", "").strip() or DEFAULT_EXPERIENCE
+
+
 def enabled():
     return os.getenv("AI_RANKING_ENABLED", "").lower() in {"1", "true", "yes"} and bool(
-        os.getenv("ANTHROPIC_API_KEY")
+        os.getenv("OPENAI_API_KEY")
     )
 
 
@@ -123,7 +124,7 @@ def _load_feedback_examples(session=None):
     return fetch(["applied", "applied_messaged", "next_round"]), fetch(["dismissed", "rejected"])
 
 
-def _system_prompt(applied, dismissed):
+def _instructions(applied, dismissed):
     applied_block = "\n".join("  - " + label for label in applied) or "  (none yet)"
     dismissed_block = "\n".join("  - " + label for label in dismissed) or "  (none yet)"
     return (
@@ -146,7 +147,8 @@ def _system_prompt(applied, dismissed):
         "- labels: a few short tags.\n\n"
         "The candidate's own history is the strongest signal — weight it heavily.\n"
         "APPLIED TO (wants more like these):\n" + applied_block + "\n"
-        "DISMISSED / REJECTED (avoid these):\n" + dismissed_block
+        "DISMISSED / REJECTED (avoid these):\n" + dismissed_block + "\n\n"
+        "Return JSON only."
     )
 
 
@@ -175,34 +177,50 @@ def _apply_result(job, result):
     job["ranking_version"] = "ai-v2"
 
 
-def _request_rankings(client, model, system, batch):
-    response = client.messages.create(
-        model=model,
-        max_tokens=4096,
-        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-        messages=[
-            {"role": "user", "content": json.dumps({"jobs": [_job_payload(job) for job in batch]})}
-        ],
-        output_config={"format": {"type": "json_schema", "schema": RANKING_SCHEMA}},
+def _request_rankings(instructions, batch, session):
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
+    payload = {"instructions": instructions, "jobs": [_job_payload(job) for job in batch]}
+    response = session.post(
+        OPENAI_ENDPOINT,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": model,
+            "input": json.dumps(payload),
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "job_rankings",
+                    "schema": RANKING_SCHEMA,
+                    "strict": True,
+                }
+            },
+        },
+        timeout=60,
     )
-    if getattr(response, "stop_reason", None) == "refusal":
-        raise ValueError("model declined the ranking request")
-    text = next((block.text for block in response.content if getattr(block, "type", None) == "text"), "")
-    return json.loads(text)
+    response.raise_for_status()
+    data = response.json()
+    output = data.get("output") or []
+    text_parts = []
+    for item in output:
+        for content in item.get("content") or []:
+            if content.get("type") in {"output_text", "text"}:
+                text_parts.append(content.get("text", ""))
+    if not text_parts and data.get("output_text"):
+        text_parts.append(data["output_text"])
+    return json.loads("".join(text_parts))
 
 
-def rank_jobs(jobs, client=None):
+def rank_jobs(jobs, session=None):
     if not enabled() or not jobs:
         return {"enabled": False, "ranked": 0, "errors": []}
 
-    if client is None:
-        import anthropic
-
-        client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the env
-    model = os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL
-
-    applied, dismissed = _load_feedback_examples()
-    system = _system_prompt(applied, dismissed)
+    session = session or requests.Session()
+    applied, dismissed = _load_feedback_examples(session)
+    instructions = _instructions(applied, dismissed)
 
     # Only rank jobs that cleared the deterministic gate; rejects are already
     # hidden, so spending model calls on them is wasted.
@@ -217,8 +235,8 @@ def rank_jobs(jobs, client=None):
     for start in range(0, len(candidates), _batch_size()):
         batch = candidates[start : start + _batch_size()]
         try:
-            result = _request_rankings(client, model, system, batch)
-        except Exception as exc:  # network/parse/refusal -> keep deterministic scores
+            result = _request_rankings(instructions, batch, session)
+        except (requests.RequestException, ValueError, json.JSONDecodeError) as exc:
             errors.append(str(exc))
             continue
         for item in result.get("jobs") or []:

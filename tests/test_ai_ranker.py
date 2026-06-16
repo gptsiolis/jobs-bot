@@ -5,41 +5,37 @@ import unittest
 import ai_ranker
 
 
-class FakeBlock:
-    type = "text"
-
-    def __init__(self, text):
-        self.text = text
-
-
 class FakeResponse:
-    stop_reason = "end_turn"
-
-    def __init__(self, payload):
-        self.content = [FakeBlock(json.dumps(payload))]
-
-
-class FakeMessages:
     def __init__(self, payload):
         self._payload = payload
 
-    def create(self, **kwargs):
-        return FakeResponse(self._payload)
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "output": [
+                {"content": [{"type": "output_text", "text": json.dumps(self._payload)}]}
+            ]
+        }
 
 
-class FakeClient:
+class FakeSession:
     def __init__(self, payload):
-        self.messages = FakeMessages(payload)
+        self._payload = payload
+
+    def post(self, *args, **kwargs):
+        return FakeResponse(self._payload)
 
 
 class AiRankerTests(unittest.TestCase):
     def setUp(self):
         self._saved = {
             k: os.environ.get(k)
-            for k in ("AI_RANKING_ENABLED", "ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
+            for k in ("AI_RANKING_ENABLED", "OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
         }
         os.environ["AI_RANKING_ENABLED"] = "true"
-        os.environ["ANTHROPIC_API_KEY"] = "test-key"
+        os.environ["OPENAI_API_KEY"] = "test-key"
         # Disable the feedback-history fetch so the test makes no network call.
         os.environ.pop("SUPABASE_URL", None)
         os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
@@ -97,7 +93,7 @@ class AiRankerTests(unittest.TestCase):
             },
         ]
 
-        result = ai_ranker.rank_jobs(jobs, client=FakeClient(payload))
+        result = ai_ranker.rank_jobs(jobs, session=FakeSession(payload))
 
         self.assertTrue(result["enabled"])
         self.assertEqual(result["ranked"], 2)
@@ -112,7 +108,7 @@ class AiRankerTests(unittest.TestCase):
 
     def test_rank_jobs_skips_rejects(self):
         jobs = [{"job_id": "job-x", "job_title": "X", "fit_bucket": "reject"}]
-        result = ai_ranker.rank_jobs(jobs, client=FakeClient({"jobs": []}))
+        result = ai_ranker.rank_jobs(jobs, session=FakeSession({"jobs": []}))
         self.assertEqual(result["ranked"], 0)
 
 
