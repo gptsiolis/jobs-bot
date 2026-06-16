@@ -31,6 +31,43 @@ NON_US_KEYWORDS = [
     "korea", "china", "hong kong", "taiwan",
 ]
 
+# Non-US countries/regions/cities for matching against a LOCATION string.
+# Matched with word boundaries so "uk" can't hit "Milwaukee" and "india"
+# can't hit "Indiana". Deliberately excludes US-ambiguous names (e.g.
+# Georgia the country vs the US state).
+NON_US_LOCATION_TOKENS = [
+    "uk", "united kingdom", "england", "scotland", "wales", "ireland",
+    "emea", "apac", "latam", "europe", "latin america", "middle east",
+    "germany", "france", "spain", "portugal", "italy", "netherlands",
+    "belgium", "sweden", "norway", "denmark", "finland", "switzerland",
+    "austria", "poland", "czechia", "romania", "greece", "turkey",
+    "russia", "ukraine", "india", "china", "japan", "south korea", "korea",
+    "singapore", "taiwan", "hong kong", "thailand", "vietnam", "philippines",
+    "indonesia", "malaysia", "australia", "new zealand", "canada", "mexico",
+    "brazil", "argentina", "colombia", "chile", "peru", "israel",
+    "united arab emirates", "uae", "saudi arabia", "qatar", "egypt",
+    "nigeria", "kenya", "south africa", "morocco",
+    "london", "manchester", "dublin", "berlin", "munich", "paris", "madrid",
+    "barcelona", "lisbon", "rome", "milan", "amsterdam", "stockholm", "oslo",
+    "copenhagen", "helsinki", "zurich", "geneva", "vienna", "warsaw", "prague",
+    "athens", "istanbul", "dubai", "abu dhabi", "tel aviv", "bangalore",
+    "bengaluru", "mumbai", "new delhi", "delhi", "hyderabad", "pune", "chennai",
+    "gurgaon", "beijing", "shanghai", "shenzhen", "tokyo", "osaka", "seoul",
+    "taipei", "bangkok", "jakarta", "manila", "kuala lumpur", "ho chi minh",
+    "hanoi", "sydney", "melbourne", "brisbane", "perth", "auckland", "toronto",
+    "vancouver", "montreal", "ottawa", "calgary", "mexico city", "sao paulo",
+    "rio de janeiro", "buenos aires", "bogota", "santiago", "lima", "lagos",
+    "nairobi", "cairo", "johannesburg", "cape town",
+]
+_NON_US_LOCATION_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(t) for t in NON_US_LOCATION_TOKENS) + r")\b"
+)
+
+
+def is_non_us_location(location):
+    """True if a LOCATION string names a non-US country/region/city."""
+    return bool(_NON_US_LOCATION_RE.search((location or "").lower()))
+
 
 def stable_job_hash(value):
     """Deterministic short hash for building cross-run-stable job IDs.
@@ -233,11 +270,22 @@ def is_non_us(text):
 
 
 def is_allowed_location(location_blob, title=""):
-    """True if location matches an allowed metro, or is remote (when allowed)."""
-    blob = ((location_blob or "") + " " + (title or "")).lower()
-    if ALLOW_REMOTE and "remote" in blob:
+    """True if location matches an allowed metro, or is remote (when allowed).
+
+    A location that names a non-US country/region is rejected even when the
+    posting is remote, so "Remote - Ireland" or "Sydney, Australia" don't slip
+    through on the remote bypass.
+    """
+    location = (location_blob or "").lower()
+    blob = location + " " + (title or "").lower()
+    # An explicit allowed US metro anywhere wins, even if other (incl. non-US)
+    # locations are also listed — "SF, NY, or Remote" is fine.
+    if any(tok in blob for tok in _ALLOWED_LOCATION_TOKENS):
         return True
-    return any(tok in blob for tok in _ALLOWED_LOCATION_TOKENS)
+    # Otherwise allow remote only when it isn't pinned to a non-US locale.
+    if ALLOW_REMOTE and "remote" in blob and not is_non_us_location(location):
+        return True
+    return False
 
 
 def is_allowed_company(employer_name):

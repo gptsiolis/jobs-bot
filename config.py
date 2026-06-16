@@ -242,12 +242,15 @@ INTERNSHIP_KEYWORDS = [
 # ALLOW_REMOTE = True). Add aliases liberally — matching is substring-based
 # on the lowercased location/title blob.
 LOCATION_ALLOW = {
+    # NOTE: bare state abbreviations ("la,", "ny,") are intentionally NOT used —
+    # they false-match other cities in those states (Lake Charles, LA; Buffalo,
+    # NY). Real LA/NYC postings are caught by the city/neighborhood tokens below.
     "Los Angeles": [
-        "los angeles", "la,", " la ", "la (", "santa monica", "venice ca",
-        "culver city", "west hollywood", "hollywood",
+        "los angeles", "la, ca", "santa monica", "venice ca",
+        "culver city", "west hollywood",
     ],
     "New York": [
-        "new york", "nyc", "ny,", " ny ", "manhattan", "brooklyn",
+        "new york", "nyc", "manhattan", "brooklyn",
     ],
     "San Francisco": [
         "san francisco", "sf,", " sf ", "sf bay", "bay area", "oakland",
@@ -260,8 +263,8 @@ LOCATION_ALLOW = {
         "austin",
     ],
     "Washington DC": [
-        "washington, dc", "washington, d.c.", "washington dc", " d.c.",
-        " dc,", " dc ", "arlington, va", "alexandria, va",
+        "washington, dc", "washington, d.c.", "washington dc",
+        "arlington, va", "alexandria, va",
     ],
     "Chicago": [
         "chicago",

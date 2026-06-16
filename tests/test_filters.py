@@ -135,6 +135,38 @@ class FilterTests(unittest.TestCase):
             )
         )
 
+    def test_non_us_locations_are_excluded_even_when_remote(self):
+        blocked = [
+            "Remote - Ireland",
+            "Sydney, NSW, Australia",
+            "Quezon City, Metro Manila, Philippines",
+            "Canada - Remote (ON, AB, BC, or NS Only)",
+            "Israel (Remote)",
+            "London, UK",
+        ]
+        for location in blocked:
+            with self.subTest(location=location):
+                self.assertFalse(filters.is_allowed_location(location))
+
+    def test_us_remote_and_target_metros_are_allowed(self):
+        allowed = [
+            "Remote - US",
+            "United States, Remote",
+            "New York, NY",
+            "San Francisco, CA",
+            "Indianapolis, IN (Remote)",  # US remote; must not be flagged non-US
+            "Milwaukee, WI (Remote)",     # must not match "uk" in Milwaukee
+        ]
+        for location in allowed:
+            with self.subTest(location=location):
+                self.assertTrue(filters.is_allowed_location(location))
+
+    def test_other_cities_in_target_states_are_excluded(self):
+        # State abbreviations must not leak the whole state.
+        for location in ["Lake Charles, LA, United States", "Buffalo, NY, USA", "Rochester, NY"]:
+            with self.subTest(location=location):
+                self.assertFalse(filters.is_allowed_location(location))
+
     def test_warehouse_and_logistics_operations_are_excluded(self):
         blocked = [
             ("Warehouse Operations Associate", "New York, NY", ""),
