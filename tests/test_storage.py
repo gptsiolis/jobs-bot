@@ -80,20 +80,21 @@ class StorageTests(unittest.TestCase):
             calculate_applicability_score(bd),
         )
 
-    def test_priority_role_is_never_auto_hidden(self):
-        # A chief-of-staff role asking for 2+ years scores low but stays visible.
-        stretch_cos = {
+    def test_low_fit_priority_role_is_hidden(self):
+        # Priority roles still get the ranking boost, but a low-scoring one is
+        # tucked behind the toggle rather than always shown.
+        stretch = {
             "job_title": "Chief of Staff",
-            "job_description": "Requires 5+ years of operating experience.",
+            "job_description": "Strong operating background preferred.",
             "locations": ["Remote"],
-            "fit_bucket": "possible",
+            "fit_bucket": "unknown",
             "role_family": "operations_strategy",
-            "fit_reasons": ["2+ years mentioned"],
+            "fit_reasons": ["experience unknown"],
             "sponsor_tier": "unknown_no_ban",
             "quality_tier": "acceptable",
         }
-        self.assertLess(calculate_applicability_score(stretch_cos), 55)
-        self.assertEqual(job_visibility(stretch_cos), "default")
+        self.assertLess(calculate_applicability_score(stretch), 55)
+        self.assertEqual(job_visibility(stretch), "hidden")
 
     def test_normalize_job_record_maps_scraper_shape_to_database_shape(self):
         record = normalize_job_record(

@@ -167,6 +167,25 @@ class FilterTests(unittest.TestCase):
             with self.subTest(location=location):
                 self.assertFalse(filters.is_allowed_location(location))
 
+    def test_five_plus_years_is_rejected(self):
+        for desc in [
+            "Requires 5+ years of experience.",
+            "Minimum of 7 years in operations.",
+            "8-10 years of relevant experience required.",
+        ]:
+            with self.subTest(desc=desc):
+                self.assertEqual(
+                    filters.fit_metadata("Operations Associate", desc)["fit_bucket"], "reject"
+                )
+        # An explicit entry-level signal protects against a stray high number.
+        self.assertNotEqual(
+            filters.fit_metadata(
+                "Operations Associate",
+                "Great for new grads with 0-1 years; our team has 10+ years combined.",
+            )["fit_bucket"],
+            "reject",
+        )
+
     def test_warehouse_and_logistics_operations_are_excluded(self):
         blocked = [
             ("Warehouse Operations Associate", "New York, NY", ""),

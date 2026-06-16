@@ -150,6 +150,21 @@ NEGATIVE_SENIORITY_TEXT = [
     "team leadership experience",
 ]
 
+# 5+ years is out of range for an entry-level search. Matched separately from
+# the 2+ "stretch" signal so these get rejected, not just down-ranked.
+SENIOR_EXPERIENCE_PATTERN = re.compile(
+    r"\b(?:minimum of |at least |requires? )?([5-9]|[1-9][0-9])\+?\s+"
+    r"(?:year|years|yr|yrs)\b"
+)
+SENIOR_EXPERIENCE_TEXT = [
+    "senior-level", "director-level", "vp-level", "executive-level",
+    "5+ years", "6+ years", "7+ years", "8+ years", "10+ years",
+    # spelled-out forms the digit pattern misses
+    "five years", "six years", "seven years", "eight years", "nine years",
+    "ten years", "twelve years", "fifteen years",
+    "five+ years", "five or more years", "minimum of five",
+]
+
 SPONSOR_BLOCK_TEXT = [
     "will not sponsor",
     "does not sponsor",
@@ -398,6 +413,15 @@ def _has_negative_experience(text):
     return any(int(match.group(1)) >= 2 for match in NEGATIVE_EXPERIENCE_PATTERN.finditer(t))
 
 
+def _has_senior_experience(text):
+    """True when the posting clearly requires 5+ years — out of range for an
+    entry-level search, so rejected rather than just down-ranked."""
+    t = (text or "").lower()
+    if any(phrase in t for phrase in SENIOR_EXPERIENCE_TEXT):
+        return True
+    return any(int(match.group(1)) >= 5 for match in SENIOR_EXPERIENCE_PATTERN.finditer(t))
+
+
 def sponsor_eligibility_metadata(text):
     """Return sponsor/work-auth eligibility metadata from posting text."""
     normalized = _normalize_text(text).lower()
@@ -470,6 +494,8 @@ def fit_metadata(title, description=""):
         return _meta("reject", ["warehouse/logistics operations"])
     if compensation_below_floor(text):
         return _meta("reject")
+    if _has_senior_experience(text) and not positive_desc:
+        return _meta("reject", ["requires 5+ years"])
 
     # An explicit entry-level title word (associate/analyst/coordinator/
     # representative) counts as early-career even on a tier-3 (BD/sales) role,

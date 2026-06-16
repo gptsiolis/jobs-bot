@@ -178,8 +178,6 @@ def job_visibility(job):
         return explicit
     if job.get("fit_bucket") == "reject":
         return "hidden"
-    if is_priority_role(job):
-        return "default"
     if calculate_applicability_score(job) < 55:
         return "hidden"
     return "default"
