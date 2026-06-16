@@ -303,6 +303,32 @@ tbody tr.is-selected:hover {
   font-weight: 700;
 }
 
+.fit-pill {
+  text-transform: capitalize;
+}
+
+.pill.fit-strong {
+  color: var(--good);
+  border-color: rgba(29, 127, 85, 0.35);
+  background: #eefaf4;
+}
+
+.pill.fit-possible {
+  color: var(--warn);
+  border-color: rgba(154, 98, 0, 0.3);
+  background: #fff6e9;
+}
+
+.pill.fit-unknown {
+  color: var(--muted);
+}
+
+.pill.fit-reject {
+  color: var(--bad);
+  border-color: rgba(163, 58, 52, 0.3);
+  background: #fff1ef;
+}
+
 .reorder-list .drag-handle {
   width: 34px;
   color: var(--muted);

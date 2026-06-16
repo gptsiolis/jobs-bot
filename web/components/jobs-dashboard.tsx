@@ -15,7 +15,44 @@ import {
 import { reorderJobs, updateJobStatus } from "@/app/actions";
 import type { JobRow, JobStatus } from "@/lib/types";
 
-const fitOrder = ["strong", "possible", "unknown", "reject"];
+const roleFamilyMeta = [
+  { value: "operations_strategy", label: "Operations · Strategy · Chief of Staff" },
+  { value: "business_development", label: "Business Development · Sales" },
+  { value: "early_career", label: "Early Career / New Grad" },
+  { value: "other", label: "Other roles" }
+];
+
+const roleFamilyLabels: Record<string, string> = Object.fromEntries(
+  roleFamilyMeta.map((family) => [family.value, family.label])
+);
+
+const knownRoleFamilies = new Set(["operations_strategy", "business_development", "early_career"]);
+const opsTitleTerms = [
+  "chief of staff", "business operations", "revenue operations", "operations", "strategy",
+  "founder's associate", "founders associate", "founder associate", "special projects",
+  "program associate", "program coordinator"
+];
+const bdTitleTerms = [
+  "business development", "sales development", "account executive", "account manager",
+  "sales associate", "sales representative", "partnership", "growth", "customer success",
+  "investment analyst", "investment associate", "acquisitions", "asset management"
+];
+const earlyTitleTerms = [
+  "new grad", "new graduate", "recent graduate", "early career", "entry level", "entry-level",
+  "rotational", "graduate program", "analyst program", "associate program"
+];
+
+// Group jobs by role type. Prefer the server-assigned role_family; fall back to
+// title keywords so jobs scraped before role_family existed still categorize.
+function roleFamilyOf(job: JobRow): string {
+  if (job.role_family && knownRoleFamilies.has(job.role_family)) return job.role_family;
+  const title = job.title.toLowerCase();
+  if (opsTitleTerms.some((term) => title.includes(term))) return "operations_strategy";
+  if (bdTitleTerms.some((term) => title.includes(term))) return "business_development";
+  if (earlyTitleTerms.some((term) => title.includes(term))) return "early_career";
+  return "other";
+}
+
 const statusLabels: Record<JobStatus, string> = {
   new: "New",
   saved: "Saved",
@@ -328,7 +365,7 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
 
   const grouped = useMemo(() => {
     return filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
-      const key = job.fit_bucket || "unknown";
+      const key = roleFamilyOf(job);
       acc[key] = acc[key] || [];
       acc[key].push(job);
       return acc;
@@ -441,19 +478,20 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
             />
           ) : null}
           {!reorderable &&
-            fitOrder
-              .filter((bucket) => grouped[bucket]?.length)
-              .map((bucket) => (
-              <div className="job-section" key={bucket}>
+            roleFamilyMeta
+              .filter((family) => grouped[family.value]?.length)
+              .map((family) => (
+              <div className="job-section" key={family.value}>
                 <h2 className="section-title">
-                  <span>{bucket}</span>
-                  <span className="muted">{grouped[bucket].length}</span>
+                  <span>{family.label}</span>
+                  <span className="muted">{grouped[family.value].length}</span>
                 </h2>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
                         <th>Score</th>
+                        <th>Fit</th>
                         <th>Role</th>
                         <th>Company</th>
                         <th>Location</th>
@@ -464,13 +502,18 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {grouped[bucket].map((job) => (
+                      {grouped[family.value].map((job) => (
                         <tr
                           key={job.job_id}
                           className={job.job_id === selected?.job_id ? "is-selected" : ""}
                           onClick={() => setSelectedId(job.job_id)}
                         >
                           <td className="score">{job.applicability_score}</td>
+                          <td>
+                            <span className={`pill fit-pill fit-${job.fit_bucket}`}>
+                              {job.fit_bucket}
+                            </span>
+                          </td>
                           <td>
                             {job.apply_url ? (
                               <a
@@ -548,12 +591,8 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
                 </dd>
                 <dt>Quality</dt>
                 <dd>{selected.quality_tier}</dd>
-                {selected.role_family ? (
-                  <>
-                    <dt>Role family</dt>
-                    <dd>{selected.role_family}</dd>
-                  </>
-                ) : null}
+                <dt>Role type</dt>
+                <dd>{roleFamilyLabels[roleFamilyOf(selected)]}</dd>
                 {selected.ai_fit_score !== null ? (
                   <>
                     <dt>AI fit</dt>
