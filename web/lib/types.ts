@@ -27,6 +27,7 @@ export type JobRow = {
   applicability_score: number;
   status: JobStatus;
   applied_at: string | null;
+  contact_responded: boolean;
   manual_rank: number | null;
   visibility: string;
   role_family: string;

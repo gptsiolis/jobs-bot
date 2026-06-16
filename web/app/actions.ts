@@ -61,6 +61,28 @@ export async function updateJobStatus(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateContactResponded(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "");
+  const responded = String(formData.get("responded") || "") === "true";
+
+  if (!jobId) {
+    throw new Error("Invalid contact response update");
+  }
+
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ contact_responded: responded })
+    .eq("job_id", jobId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
 const reorderableStatuses: JobStatus[] = ["saved", "applied", "applied_messaged"];
 
 export async function reorderJobs(status: JobStatus, orderedIds: string[]) {
