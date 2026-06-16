@@ -17,6 +17,15 @@ DEFAULT_MODEL = "claude-haiku-4-5"
 DEFAULT_BATCH_SIZE = 12
 EXAMPLE_LIMIT = 25
 
+# The candidate's experience baseline that attainability is judged against.
+# Override per-run with the CANDIDATE_EXPERIENCE env var rather than editing
+# this prompt.
+DEFAULT_EXPERIENCE = "a candidate with new-grad to roughly 2 years of full-time experience"
+
+
+def _experience_profile():
+    return os.getenv("CANDIDATE_EXPERIENCE", "").strip() or DEFAULT_EXPERIENCE
+
 RANKING_SCHEMA = {
     "type": "object",
     "properties": {
@@ -118,15 +127,15 @@ def _system_prompt(applied, dismissed):
     applied_block = "\n".join("  - " + label for label in applied) or "  (none yet)"
     dismissed_block = "\n".join("  - " + label for label in dismissed) or "  (none yet)"
     return (
-        "You screen jobs for an early-career candidate with roughly zero years of "
-        "full-time experience, targeting US (or US-remote) roles at venture-backed "
-        "startups. Priority order of role types: (1) operations / strategy / "
-        "chief-of-staff, (2) business development / partnerships / sales, "
-        "(3) other early-career business roles.\n\n"
+        "You screen jobs for " + _experience_profile() + ", targeting US (or "
+        "US-remote) roles at venture-backed startups. Priority order of role types: "
+        "(1) operations / strategy / chief-of-staff, (2) business development / "
+        "partnerships / sales, (3) other early-career business roles.\n\n"
         "For each job return:\n"
-        "- attainable: true ONLY if someone with ~0 years could realistically be "
-        "hired. Senior scope, 5+ years required, or management/leadership "
-        "responsibilities -> false.\n"
+        "- attainable: true if this candidate could realistically be hired. Roles "
+        "asking up to ~2-3 years of experience are in range; treat 3-4 years as a "
+        "stretch (still attainable, but a reach). Clearly senior or lead roles, 5+ "
+        "years required, or real management/leadership responsibility -> false.\n"
         "- fit_score (0-100): overall desirability combining role-type priority "
         "(ops/strategy/chief-of-staff highest), attainability, and resemblance to "
         "the roles the candidate has APPLIED to versus DISMISSED.\n"
