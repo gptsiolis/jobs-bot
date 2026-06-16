@@ -7,7 +7,49 @@ Consider boards are client-side rendered — requires Playwright to
 execute JavaScript and extract job data from the DOM.
 """
 
+import re
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from . import filters
+
+
+def clean_apply_url(url):
+    """Drop tracking params (utm_*) so the same posting hashes identically no
+    matter which VC board surfaced it — otherwise cross-board copies of one
+    role become separate jobs."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    query = [(k, v) for k, v in parse_qsl(parts.query) if not k.lower().startswith("utm_")]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+
+
+def _slug_to_name(slug):
+    name = re.sub(r"[-_]+", " ", slug or "").strip()
+    name = re.sub(r"\b(inc|llc|careers|jobs|hq|labs)\b", "", name).strip()
+    return name.title()
+
+
+def company_from_url(url):
+    """Best-effort employer name from an ATS apply URL, used when the board
+    doesn't expose the company name in the DOM."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return ""
+    host = parts.netloc.lower()
+    segments = [s for s in parts.path.split("/") if s]
+    if ("greenhouse.io" in host or "ashbyhq.com" in host or "lever.co" in host) and segments:
+        return _slug_to_name(segments[0])
+    if "myworkdayjobs.com" in host:
+        return _slug_to_name(host.split(".")[0])
+    base = host[4:] if host.startswith("www.") else host
+    labels = base.split(".")
+    generic = {"greenhouse", "ashbyhq", "lever", "myworkdayjobs", "workday", "boards", "job-boards"}
+    if len(labels) >= 2 and labels[-2] not in generic:
+        return _slug_to_name(labels[-2])
+    return ""
 
 
 def _extract_location(badges):
@@ -76,14 +118,15 @@ def scrape_board(page, board_url, vc_name, role_queries, skip_seniority):
         raw_jobs = _search_and_extract(page, query)
 
         for job in raw_jobs:
-            url = job.get("url", "")
+            url = clean_apply_url(job.get("url", ""))
             if url in seen_ids or not url:
                 continue
             seen_ids.add(url)
 
+            company = job.get("company") or company_from_url(url) or "Unknown"
             location = _extract_location(job.get("badges", []))
             if not filters.passes_discovery(
-                job.get("title", ""), location, job.get("company", ""),
+                job.get("title", ""), location, company,
             ):
                 continue
             is_remote = "remote" in location.lower()
@@ -91,7 +134,7 @@ def scrape_board(page, board_url, vc_name, role_queries, skip_seniority):
             normalized = {
                 "job_id": f"consider-{filters.stable_job_hash(url)}",
                 "job_title": job.get("title", ""),
-                "employer_name": job.get("company", "Unknown"),
+                "employer_name": company,
                 "job_city": "",
                 "job_state": "",
                 "job_country": "",
