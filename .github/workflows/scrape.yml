@@ -34,8 +34,8 @@ jobs:
       SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
       JOB_SEARCH_DAILY_REQUEST_LIMIT: ${{ vars.JOB_SEARCH_DAILY_REQUEST_LIMIT }}
       AI_RANKING_ENABLED: ${{ vars.AI_RANKING_ENABLED }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
       AI_BATCH_SIZE: ${{ vars.AI_BATCH_SIZE }}
       AI_DAILY_JOB_LIMIT: ${{ vars.AI_DAILY_JOB_LIMIT }}
     steps:

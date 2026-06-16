@@ -163,7 +163,9 @@ def calculate_applicability_score(job):
 
     ai_fit_score = _int_or_none(job.get("ai_fit_score"))
     if ai_fit_score is not None:
-        score = int(round((score * 0.65) + (max(0, min(100, ai_fit_score)) * 0.35)))
+        # The AI judges attainability/fit from the full JD, so let it carry real
+        # weight in the ordering (not just a light nudge).
+        score = int(round((score * 0.55) + (max(0, min(100, ai_fit_score)) * 0.45)))
 
     ai_company_score = _int_or_none(job.get("ai_company_score"))
     if ai_company_score is not None:
