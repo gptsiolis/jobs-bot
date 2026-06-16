@@ -22,7 +22,7 @@ export default async function HomePage() {
     supabase
       .from("jobs")
       .select(
-        "job_id,title,company,location_text,apply_url,source,ats,first_seen_at,last_seen_at,fit_bucket,fit_reasons,sponsor_tier,sponsor_reasons,quality_tier,sector,applicability_score,status,manual_rank,visibility,role_family,seniority_level,compensation_min,compensation_max,ai_fit_score,ai_company_score,ai_summary,ai_reject_reasons,ai_labels,description_excerpt"
+        "job_id,title,company,location_text,apply_url,source,ats,first_seen_at,last_seen_at,fit_bucket,fit_reasons,sponsor_tier,sponsor_reasons,quality_tier,sector,applicability_score,status,applied_at,manual_rank,visibility,role_family,seniority_level,compensation_min,compensation_max,ai_fit_score,ai_company_score,ai_summary,ai_reject_reasons,ai_labels,description_excerpt"
       )
       .order("applicability_score", { ascending: false })
       .order("last_seen_at", { ascending: false })

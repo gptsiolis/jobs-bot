@@ -194,6 +194,7 @@ function ReorderableJobList({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
+  const showApplied = status === "applied" || status === "applied_messaged";
 
   // Resync when the server sends a new list (revalidation, filtering, tab switch).
   useEffect(() => {
@@ -249,6 +250,7 @@ function ReorderableJobList({
               <th>Company</th>
               <th>Location</th>
               <th>Sponsor</th>
+              {showApplied ? <th>Applied</th> : null}
               <th>Actions</th>
             </tr>
           </thead>
@@ -319,6 +321,7 @@ function ReorderableJobList({
                 <td>{job.company}</td>
                 <td>{job.location_text}</td>
                 <td>{job.sponsor_tier.replaceAll("_", " ")}</td>
+                {showApplied ? <td>{formatDate(job.applied_at)}</td> : null}
                 <td onClick={(event) => event.stopPropagation()}>
                   <JobActions job={job} />
                 </td>
@@ -576,6 +579,12 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
                 <dd>{selected.applicability_score}</dd>
                 <dt>Status</dt>
                 <dd>{statusLabels[selected.status]}</dd>
+                {selected.applied_at ? (
+                  <>
+                    <dt>Applied</dt>
+                    <dd>{formatDate(selected.applied_at)}</dd>
+                  </>
+                ) : null}
                 <dt>Location</dt>
                 <dd>{selected.location_text}</dd>
                 <dt>Source</dt>
