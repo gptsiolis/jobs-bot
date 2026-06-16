@@ -2,18 +2,9 @@ import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { CompanyWatchlistMenu } from "@/components/company-watchlist-menu";
 import { JobsDashboard } from "@/components/jobs-dashboard";
+import { ScraperMenu } from "@/components/scraper-menu";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CompanyWatchlistRequest, JobRow, JobRun } from "@/lib/types";
-
-function formatHeaderDate(value: string | null) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(new Date(value));
-}
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
@@ -63,15 +54,7 @@ export default async function HomePage() {
           <span>{auth.user.email}</span>
         </div>
         <div className="topbar-actions">
-          <div className="run-chip">
-            <span className="muted">Last run</span>
-            <strong>
-              {latestRun
-                ? `${latestRun.mode} ${latestRun.status}, ${latestRun.total_new} new`
-                : "No runs"}
-            </strong>
-            {latestRun ? <span className="muted">{formatHeaderDate(latestRun.started_at)}</span> : null}
-          </div>
+          <ScraperMenu initialRun={latestRun} />
           <CompanyWatchlistMenu
             companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
           />
@@ -83,7 +66,7 @@ export default async function HomePage() {
         </div>
       </header>
       <main className="main">
-        <JobsDashboard jobs={(jobs || []) as JobRow[]} latestRun={latestRun} />
+        <JobsDashboard jobs={(jobs || []) as JobRow[]} />
       </main>
     </div>
   );

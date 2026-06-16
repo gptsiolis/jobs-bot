@@ -632,17 +632,17 @@ tbody tr.is-selected:hover {
   color: var(--bad);
 }
 
-.watchlist-menu {
+.header-menu {
   position: relative;
 }
 
-.watchlist-trigger {
+.header-menu-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.watchlist-trigger.is-open {
+.header-menu-trigger.is-open {
   color: var(--accent-strong);
   border-color: var(--accent);
 }
@@ -662,7 +662,7 @@ tbody tr.is-selected:hover {
   line-height: 1;
 }
 
-.watchlist-popover {
+.header-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -675,7 +675,20 @@ tbody tr.is-selected:hover {
   box-shadow: 0 12px 32px rgba(20, 20, 18, 0.16);
 }
 
-.watchlist-popover-head {
+.scraper-popover {
+  display: grid;
+  gap: 10px;
+}
+
+.scraper-popover form {
+  margin: 0;
+}
+
+.scraper-popover .header-popover-head {
+  margin-bottom: 0;
+}
+
+.header-popover-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -683,7 +696,7 @@ tbody tr.is-selected:hover {
   margin-bottom: 10px;
 }
 
-.watchlist-popover-head h2 {
+.header-popover-head h2 {
   margin: 0;
   font-size: 14px;
 }

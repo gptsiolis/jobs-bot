@@ -41,10 +41,10 @@ export function CompanyWatchlistMenu({
   }, [open]);
 
   return (
-    <div className="watchlist-menu" ref={containerRef}>
+    <div className="header-menu watchlist-menu" ref={containerRef}>
       <button
         type="button"
-        className={open ? "text-button watchlist-trigger is-open" : "text-button watchlist-trigger"}
+        className={open ? "text-button header-menu-trigger is-open" : "text-button header-menu-trigger"}
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -56,8 +56,8 @@ export function CompanyWatchlistMenu({
         ) : null}
       </button>
       {open ? (
-        <div className="watchlist-popover" role="dialog" aria-label="Company watchlist">
-          <div className="watchlist-popover-head">
+        <div className="header-popover watchlist-popover" role="dialog" aria-label="Company watchlist">
+          <div className="header-popover-head">
             <h2>Company Watchlist</h2>
             <button
               type="button"
