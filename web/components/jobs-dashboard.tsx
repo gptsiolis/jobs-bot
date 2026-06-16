@@ -13,7 +13,12 @@ import {
   Search,
   XCircle
 } from "lucide-react";
-import { reorderJobs, updateContactResponded, updateJobStatus } from "@/app/actions";
+import {
+  reorderJobs,
+  setCompanyContactResponded,
+  setCompanyMessaged,
+  updateJobStatus
+} from "@/app/actions";
 import type { JobRow, JobStatus } from "@/lib/types";
 
 const roleFamilyMeta = [
@@ -118,11 +123,33 @@ function StatusAction({
   );
 }
 
-function RespondedAction({ jobId, responded }: { jobId: string; responded: boolean }) {
-  const title = responded ? "Contact responded — click to undo" : "Mark contact as responded";
+function CompanyMessagedAction({ company, messaged }: { company: string; messaged: boolean }) {
+  const title = messaged
+    ? "Messaged on LinkedIn (whole company) — click to undo"
+    : "Messaged on LinkedIn — moves every applied role at this company";
   return (
-    <form action={updateContactResponded}>
-      <input type="hidden" name="job_id" value={jobId} />
+    <form action={setCompanyMessaged}>
+      <input type="hidden" name="company" value={company} />
+      <input type="hidden" name="messaged" value={messaged ? "false" : "true"} />
+      <button
+        className={messaged ? "status-button is-active" : "status-button"}
+        type="submit"
+        title={title}
+        aria-label={title}
+      >
+        <Linkedin size={16} />
+      </button>
+    </form>
+  );
+}
+
+function CompanyRespondedAction({ company, responded }: { company: string; responded: boolean }) {
+  const title = responded
+    ? "Contact responded (whole company) — click to undo"
+    : "Mark the LinkedIn contact as responded";
+  return (
+    <form action={setCompanyContactResponded}>
+      <input type="hidden" name="company" value={company} />
       <input type="hidden" name="responded" value={responded ? "false" : "true"} />
       <button
         className={responded ? "status-button is-responded" : "status-button"}
@@ -141,16 +168,9 @@ function JobActions({ job }: { job: JobRow }) {
     const messaged = job.status === "applied_messaged";
     return (
       <div className="status-actions">
-        <StatusAction
-          jobId={job.job_id}
-          status={messaged ? "applied" : "applied_messaged"}
-          title={messaged ? "Messaged a contact — click to undo" : "Mark as messaged a contact"}
-          active={messaged}
-        >
-          <Linkedin size={16} />
-        </StatusAction>
+        <CompanyMessagedAction company={job.company} messaged={messaged} />
         {messaged ? (
-          <RespondedAction jobId={job.job_id} responded={job.contact_responded} />
+          <CompanyRespondedAction company={job.company} responded={job.contact_responded} />
         ) : null}
         <StatusAction jobId={job.job_id} status="next_round" title="Moved to next round">
           <CheckCircle2 size={16} />
@@ -187,7 +207,7 @@ function JobActions({ job }: { job: JobRow }) {
   );
 }
 
-const reorderableStatuses = new Set(["saved"]);
+const reorderableStatuses = new Set(["saved", "applied", "applied_messaged"]);
 
 function byManualRank(a: JobRow, b: JobRow) {
   const ar = a.manual_rank;
@@ -217,6 +237,7 @@ function ReorderableJobList({
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const showApplied = status === "applied" || status === "applied_messaged";
+  const showContact = status === "applied_messaged";
 
   // Resync when the server sends a new list (revalidation, filtering, tab switch).
   useEffect(() => {
@@ -273,6 +294,7 @@ function ReorderableJobList({
               <th>Location</th>
               <th>Sponsor</th>
               {showApplied ? <th>Applied</th> : null}
+              {showContact ? <th>Contact</th> : null}
               <th>Actions</th>
             </tr>
           </thead>
@@ -344,6 +366,13 @@ function ReorderableJobList({
                 <td>{job.location_text}</td>
                 <td>{job.sponsor_tier.replaceAll("_", " ")}</td>
                 {showApplied ? <td>{formatDate(job.applied_at)}</td> : null}
+                {showContact ? (
+                  <td>
+                    <span className={job.contact_responded ? "pill fit-strong" : "pill"}>
+                      {job.contact_responded ? "Responded" : "Awaiting"}
+                    </span>
+                  </td>
+                ) : null}
                 <td onClick={(event) => event.stopPropagation()}>
                   <JobActions job={job} />
                 </td>
@@ -353,134 +382,6 @@ function ReorderableJobList({
         </table>
       </div>
     </div>
-  );
-}
-
-function AppliedByCompany({
-  jobs,
-  status,
-  selectedId,
-  onSelect
-}: {
-  jobs: JobRow[];
-  status: JobStatus;
-  selectedId: string;
-  onSelect: (jobId: string) => void;
-}) {
-  const showContact = status === "applied_messaged";
-
-  // Cluster applied roles by company: companies with multiple applications
-  // first, then most recently applied.
-  const groups = useMemo(() => {
-    const map = new Map<string, JobRow[]>();
-    for (const job of jobs) {
-      const rows = map.get(job.company) || [];
-      rows.push(job);
-      map.set(job.company, rows);
-    }
-    const result = Array.from(map.entries()).map(([company, rows]) => {
-      const sorted = [...rows].sort((a, b) => (b.applied_at || "").localeCompare(a.applied_at || ""));
-      const latest = sorted.reduce((acc, job) => {
-        const value = job.applied_at || "";
-        return value > acc ? value : acc;
-      }, "");
-      return { company, rows: sorted, latest };
-    });
-    result.sort(
-      (a, b) =>
-        b.rows.length - a.rows.length ||
-        b.latest.localeCompare(a.latest) ||
-        a.company.localeCompare(b.company)
-    );
-    return result;
-  }, [jobs]);
-
-  if (!groups.length) return null;
-
-  return (
-    <>
-      {groups.map((group) => (
-        <div className="job-section" key={group.company}>
-          <h2 className="section-title">
-            <span>
-              {group.company}
-              {group.rows.length > 1 ? (
-                <span className="company-count">{group.rows.length} roles</span>
-              ) : null}
-            </span>
-            <span className="muted">{formatDate(group.latest)}</span>
-          </h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Score</th>
-                  <th>Fit</th>
-                  <th>Role</th>
-                  <th>Location</th>
-                  {showContact ? <th>Contact</th> : null}
-                  <th>Applied</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.rows.map((job) => (
-                  <tr
-                    key={job.job_id}
-                    className={job.job_id === selectedId ? "is-selected" : ""}
-                    onClick={() => onSelect(job.job_id)}
-                  >
-                    <td className="score">{job.applicability_score}</td>
-                    <td>
-                      <span className={`pill fit-pill fit-${job.fit_bucket}`}>{job.fit_bucket}</span>
-                    </td>
-                    <td>
-                      {job.apply_url ? (
-                        <a
-                          className="title-button"
-                          href={job.apply_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSelect(job.job_id);
-                          }}
-                        >
-                          {job.title}
-                        </a>
-                      ) : (
-                        <button
-                          className="title-button"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onSelect(job.job_id);
-                          }}
-                        >
-                          {job.title}
-                        </button>
-                      )}
-                    </td>
-                    <td>{job.location_text}</td>
-                    {showContact ? (
-                      <td>
-                        <span className={job.contact_responded ? "pill fit-strong" : "pill"}>
-                          {job.contact_responded ? "Responded" : "Awaiting"}
-                        </span>
-                      </td>
-                    ) : null}
-                    <td>{formatDate(job.applied_at)}</td>
-                    <td onClick={(event) => event.stopPropagation()}>
-                      <JobActions job={job} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-    </>
   );
 }
 
@@ -526,7 +427,6 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
   }, [filtered]);
 
   const reorderable = reorderableStatuses.has(status);
-  const appliedView = status === "applied" || status === "applied_messaged";
   const bucketJobs = useMemo(
     () => (reorderable ? [...filtered].sort(byManualRank) : []),
     [filtered, reorderable]
@@ -631,16 +531,7 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
               onSelect={setSelectedId}
             />
           ) : null}
-          {appliedView ? (
-            <AppliedByCompany
-              jobs={filtered}
-              status={status as JobStatus}
-              selectedId={selected?.job_id || ""}
-              onSelect={setSelectedId}
-            />
-          ) : null}
           {!reorderable &&
-            !appliedView &&
             roleFamilyMeta
               .filter((family) => grouped[family.value]?.length)
               .map((family) => (

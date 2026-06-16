@@ -61,11 +61,42 @@ export async function updateJobStatus(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function updateContactResponded(formData: FormData) {
-  const jobId = String(formData.get("job_id") || "");
+// A single LinkedIn message covers a whole company, so messaging is tracked
+// per company: toggling it moves every applied role at that company into (or
+// out of) the applied_messaged bucket together.
+export async function setCompanyMessaged(formData: FormData) {
+  const company = String(formData.get("company") || "");
+  const messaged = String(formData.get("messaged") || "") === "true";
+
+  if (!company) {
+    throw new Error("Invalid company message update");
+  }
+
+  const supabase = await requireUser();
+
+  const update = messaged
+    ? { status: "applied_messaged" as JobStatus }
+    : { status: "applied" as JobStatus, contact_responded: false };
+  const fromStatus: JobStatus = messaged ? "applied" : "applied_messaged";
+
+  const { error } = await supabase
+    .from("jobs")
+    .update(update)
+    .eq("company", company)
+    .eq("status", fromStatus);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+export async function setCompanyContactResponded(formData: FormData) {
+  const company = String(formData.get("company") || "");
   const responded = String(formData.get("responded") || "") === "true";
 
-  if (!jobId) {
+  if (!company) {
     throw new Error("Invalid contact response update");
   }
 
@@ -74,7 +105,8 @@ export async function updateContactResponded(formData: FormData) {
   const { error } = await supabase
     .from("jobs")
     .update({ contact_responded: responded })
-    .eq("job_id", jobId);
+    .eq("company", company)
+    .eq("status", "applied_messaged");
 
   if (error) {
     throw new Error(error.message);
