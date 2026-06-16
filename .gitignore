@@ -8,5 +8,6 @@ logs/
 web/node_modules/
 web/.next/
 web/*.log
+web/tsconfig.tsbuildinfo
 
 .vercel

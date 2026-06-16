@@ -2,6 +2,7 @@ export type JobStatus =
   | "new"
   | "saved"
   | "applied"
+  | "applied_messaged"
   | "next_round"
   | "rejected"
   | "dismissed"
@@ -25,6 +26,7 @@ export type JobRow = {
   sector: string;
   applicability_score: number;
   status: JobStatus;
+  manual_rank: number | null;
   visibility: string;
   role_family: string;
   seniority_level: string;

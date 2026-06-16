@@ -1,29 +1,27 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
   Bookmark,
   CheckCircle2,
   ExternalLink,
+  GripVertical,
+  Linkedin,
   Play,
-  Plus,
   RotateCcw,
   Search,
   XCircle
 } from "lucide-react";
-import {
-  addCompanyWatchlistRequest,
-  triggerScraperRun,
-  updateJobStatus
-} from "@/app/actions";
-import type { CompanyWatchlistRequest, JobRow, JobRun, JobStatus } from "@/lib/types";
+import { reorderJobs, triggerScraperRun, updateJobStatus } from "@/app/actions";
+import type { JobRow, JobRun, JobStatus } from "@/lib/types";
 
 const fitOrder = ["strong", "possible", "unknown", "reject"];
 const statusLabels: Record<JobStatus, string> = {
   new: "New",
   saved: "Saved",
   applied: "Applied",
+  applied_messaged: "Applied · Messaged",
   next_round: "Next Round",
   rejected: "Rejected",
   dismissed: "Dismissed",
@@ -35,6 +33,7 @@ const phaseTabs = [
   { value: "new", label: "New" },
   { value: "saved", label: "Saved" },
   { value: "applied", label: "Applied" },
+  { value: "applied_messaged", label: "Applied · Messaged" },
   { value: "next_round", label: "Next Round" },
   { value: "rejected", label: "Rejected" },
 ];
@@ -57,18 +56,25 @@ function StatusAction({
   jobId,
   status,
   title,
+  active,
   children
 }: {
   jobId: string;
   status: JobStatus;
   title: string;
+  active?: boolean;
   children: ReactNode;
 }) {
   return (
     <form action={updateJobStatus}>
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="status" value={status} />
-      <button className="status-button" type="submit" title={title} aria-label={title}>
+      <button
+        className={active ? "status-button is-active" : "status-button"}
+        type="submit"
+        title={title}
+        aria-label={title}
+      >
         {children}
       </button>
     </form>
@@ -76,9 +82,18 @@ function StatusAction({
 }
 
 function JobActions({ job }: { job: JobRow }) {
-  if (job.status === "applied") {
+  if (job.status === "applied" || job.status === "applied_messaged") {
+    const messaged = job.status === "applied_messaged";
     return (
       <div className="status-actions">
+        <StatusAction
+          jobId={job.job_id}
+          status={messaged ? "applied" : "applied_messaged"}
+          title={messaged ? "Messaged a contact — click to undo" : "Mark as messaged a contact"}
+          active={messaged}
+        >
+          <Linkedin size={16} />
+        </StatusAction>
         <StatusAction jobId={job.job_id} status="next_round" title="Moved to next round">
           <CheckCircle2 size={16} />
         </StatusAction>
@@ -114,9 +129,170 @@ function JobActions({ job }: { job: JobRow }) {
   );
 }
 
-function atsLabel(request: CompanyWatchlistRequest) {
-  const ats = request.ats_config?.ats;
-  return typeof ats === "string" ? ats : request.status;
+const reorderableStatuses = new Set(["saved", "applied", "applied_messaged"]);
+
+function byManualRank(a: JobRow, b: JobRow) {
+  const ar = a.manual_rank;
+  const br = b.manual_rank;
+  if (ar !== null && br !== null && ar !== br) return ar - br;
+  if (ar !== null && br === null) return -1;
+  if (ar === null && br !== null) return 1;
+  if (a.applicability_score !== b.applicability_score) {
+    return b.applicability_score - a.applicability_score;
+  }
+  return (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
+}
+
+function ReorderableJobList({
+  jobs,
+  status,
+  selectedId,
+  onSelect
+}: {
+  jobs: JobRow[];
+  status: JobStatus;
+  selectedId: string;
+  onSelect: (jobId: string) => void;
+}) {
+  const [order, setOrder] = useState<JobRow[]>(jobs);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  // Resync when the server sends a new list (revalidation, filtering, tab switch).
+  useEffect(() => {
+    setOrder(jobs);
+  }, [jobs]);
+
+  const persist = useCallback(
+    (next: JobRow[]) => {
+      startTransition(async () => {
+        await reorderJobs(status, next.map((job) => job.job_id));
+      });
+    },
+    [status]
+  );
+
+  const moveTo = useCallback(
+    (from: number, to: number) => {
+      if (from === to || from < 0 || to < 0) return;
+      setOrder((current) => {
+        if (from >= current.length || to >= current.length) return current;
+        const next = [...current];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        persist(next);
+        return next;
+      });
+    },
+    [persist]
+  );
+
+  const handleDrop = (targetIndex: number) => {
+    if (dragIndex !== null) moveTo(dragIndex, targetIndex);
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  if (!order.length) return null;
+
+  return (
+    <div className={pending ? "job-section reorder-list is-saving" : "job-section reorder-list"}>
+      <h2 className="section-title">
+        <span>Priority order</span>
+        <span className="muted">drag to rank &middot; {order.length}</span>
+      </h2>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th aria-label="Reorder" />
+              <th>#</th>
+              <th>Score</th>
+              <th>Role</th>
+              <th>Company</th>
+              <th>Location</th>
+              <th>Sponsor</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.map((job, index) => (
+              <tr
+                key={job.job_id}
+                draggable
+                onDragStart={(event) => {
+                  setDragIndex(index);
+                  event.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  handleDrop(index);
+                }}
+                onDragEnd={() => {
+                  setDragIndex(null);
+                  setOverIndex(null);
+                }}
+                className={[
+                  job.job_id === selectedId ? "is-selected" : "",
+                  index === dragIndex ? "is-dragging" : "",
+                  index === overIndex && dragIndex !== null && dragIndex !== index ? "is-drop-target" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => onSelect(job.job_id)}
+              >
+                <td className="drag-handle" aria-hidden="true">
+                  <GripVertical size={16} />
+                </td>
+                <td className="score">{index + 1}</td>
+                <td className="score">{job.applicability_score}</td>
+                <td>
+                  {job.apply_url ? (
+                    <a
+                      className="title-button"
+                      href={job.apply_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      draggable={false}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(job.job_id);
+                      }}
+                    >
+                      {job.title}
+                    </a>
+                  ) : (
+                    <button
+                      className="title-button"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(job.job_id);
+                      }}
+                    >
+                      {job.title}
+                    </button>
+                  )}
+                </td>
+                <td>{job.company}</td>
+                <td>{job.location_text}</td>
+                <td>{job.sponsor_tier.replaceAll("_", " ")}</td>
+                <td onClick={(event) => event.stopPropagation()}>
+                  <JobActions job={job} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 type EstimatedRun = JobRun & { estimate_seconds?: number | null };
@@ -324,11 +500,9 @@ function ScraperPanel({ initialRun }: { initialRun: JobRun | null }) {
 
 export function JobsDashboard({
   jobs,
-  companyRequests,
   latestRun
 }: {
   jobs: JobRow[];
-  companyRequests: CompanyWatchlistRequest[];
   latestRun: JobRun | null;
 }) {
   const [query, setQuery] = useState("");
@@ -338,10 +512,6 @@ export function JobsDashboard({
   const [location, setLocation] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
-  const [companyState, companyAction, companyPending] = useActionState(
-    addCompanyWatchlistRequest,
-    { ok: true, message: "" }
-  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -375,6 +545,12 @@ export function JobsDashboard({
     }, {});
   }, [filtered]);
 
+  const reorderable = reorderableStatuses.has(status);
+  const bucketJobs = useMemo(
+    () => (reorderable ? [...filtered].sort(byManualRank) : []),
+    [filtered, reorderable]
+  );
+
   const locations = unique(
     jobs.flatMap((job) =>
       job.location_text
@@ -388,33 +564,6 @@ export function JobsDashboard({
     <>
       <section className="controls-grid">
         <ScraperPanel initialRun={latestRun} />
-
-        <div className="control-panel">
-          <h2>Company Watchlist</h2>
-          <form action={companyAction} className="inline-form">
-            <input name="company_name" placeholder="Company name" />
-            <button className="primary-button" type="submit" disabled={companyPending}>
-              <Plus size={15} />
-              Add
-            </button>
-          </form>
-          {companyState.message ? (
-            <span className={companyState.ok ? "action-message" : "action-message is-error"}>
-              {companyState.message}
-            </span>
-          ) : null}
-          {companyRequests.length ? (
-            <div className="request-list">
-              {companyRequests.map((request) => (
-                <div className="request-row" key={request.id}>
-                  <strong>{request.company_name}</strong>
-                  <span className="pill">{atsLabel(request)}</span>
-                  {request.last_error ? <span className="muted">{request.last_error}</span> : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
       </section>
 
       <nav className="phase-tabs" aria-label="Job phases">
@@ -497,9 +646,18 @@ export function JobsDashboard({
 
       <div className="content-grid">
         <section>
-          {fitOrder
-            .filter((bucket) => grouped[bucket]?.length)
-            .map((bucket) => (
+          {reorderable && bucketJobs.length ? (
+            <ReorderableJobList
+              jobs={bucketJobs}
+              status={status as JobStatus}
+              selectedId={selected?.job_id || ""}
+              onSelect={setSelectedId}
+            />
+          ) : null}
+          {!reorderable &&
+            fitOrder
+              .filter((bucket) => grouped[bucket]?.length)
+              .map((bucket) => (
               <div className="job-section" key={bucket}>
                 <h2 className="section-title">
                   <span>{bucket}</span>

@@ -9,6 +9,7 @@ const allowedStatuses: JobStatus[] = [
   "new",
   "saved",
   "applied",
+  "applied_messaged",
   "next_round",
   "rejected",
   "dismissed",
@@ -53,6 +54,30 @@ export async function updateJobStatus(formData: FormData) {
     .update({ status })
     .eq("job_id", jobId);
 
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+const reorderableStatuses: JobStatus[] = ["saved", "applied", "applied_messaged"];
+
+export async function reorderJobs(status: JobStatus, orderedIds: string[]) {
+  if (!reorderableStatuses.includes(status)) {
+    throw new Error("Reordering is only supported for saved and applied jobs");
+  }
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return;
+  }
+
+  const supabase = await requireUser();
+  const payload = orderedIds.map((jobId, index) => ({
+    job_id: String(jobId),
+    manual_rank: index
+  }));
+
+  const { error } = await supabase.rpc("reorder_jobs", { payload });
   if (error) {
     throw new Error(error.message);
   }
