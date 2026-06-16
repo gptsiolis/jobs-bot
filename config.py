@@ -88,7 +88,7 @@ CONSIDER_BOARDS = {
 # excluded entirely. Tier number drives digest grouping/priority
 # (1 = highest). Precedence is top-down: tier 1 keywords are checked
 # first, so e.g. "New Grad Business Operations" matches tier 1.
-ROLE_TIERS = {
+_DEFAULT_ROLE_TIERS = {
     1: [  # PRIORITY — operations / strategy / chief of staff (generalist startup roles)
         "chief of staff",
         "founder's associate",
@@ -155,9 +155,58 @@ ROLE_TIERS = {
     ],
 }
 
+def _load_role_tiers_from_db():
+    """Load role keywords from Supabase when running scrapers.
+
+    Gated behind LOAD_ROLE_PREFS=1 (set in the scraper workflow) so local dev
+    and tests stay on the static defaults. Falls back to the defaults on any
+    error or if the table doesn't cover all three tiers, so a bad edit can't
+    silently break a run.
+    """
+    if os.environ.get("LOAD_ROLE_PREFS") != "1":
+        return None
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY", "")
+    if not url or not key:
+        return None
+    family_to_tier = {
+        "operations_strategy": 1,
+        "early_career": 2,
+        "business_development": 3,
+    }
+    try:
+        import requests
+
+        resp = requests.get(
+            url + "/rest/v1/role_preferences?select=keyword,family",
+            headers={"apikey": key, "Authorization": "Bearer " + key},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        rows = resp.json()
+    except Exception as exc:  # network/parse error -> use defaults
+        print(f"[config] Could not load role preferences ({exc}); using defaults.")
+        return None
+
+    tiers = {1: [], 2: [], 3: []}
+    for row in rows or []:
+        tier = family_to_tier.get(row.get("family"))
+        keyword = (row.get("keyword") or "").strip().lower()
+        if tier and keyword:
+            tiers[tier].append(keyword)
+    if all(tiers[t] for t in (1, 2, 3)):
+        print(f"[config] Loaded {sum(len(v) for v in tiers.values())} role keywords from Supabase.")
+        return tiers
+    return None
+
+
+# Editable role keywords live in the Supabase role_preferences table; fall back
+# to the static defaults above for local dev/tests or if the table is empty.
+ROLE_TIERS = _load_role_tiers_from_db() or _DEFAULT_ROLE_TIERS
+
 # Flat list of all role keywords. Used verbatim as discovery search
 # queries (aggregators / Workday) and for title-side matching. Derived
-# from ROLE_TIERS — edit the tiers above, not this.
+# from ROLE_TIERS.
 ROLE_QUERIES = [kw for kws in ROLE_TIERS.values() for kw in kws]
 
 # ── Seniority filter ─────────────────────────────────────────

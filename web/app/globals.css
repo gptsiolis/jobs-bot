@@ -743,6 +743,94 @@ tbody tr.is-selected:hover {
   font-size: 13px;
 }
 
+.pref-popover {
+  width: min(420px, calc(100vw - 28px));
+  max-height: 72vh;
+  overflow: auto;
+}
+
+.pref-intro {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.pref-add {
+  display: grid;
+  gap: 6px;
+}
+
+.pref-add select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.pref-add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.pref-add-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0 10px;
+}
+
+.pref-section {
+  margin-top: 14px;
+}
+
+.pref-section h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.pref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  font-size: 12px;
+}
+
+.pref-chip-remove {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+}
+
+.pref-chip-remove:hover {
+  color: var(--bad);
+}
+
+.pref-empty {
+  margin: 0;
+  font-size: 12px;
+}
+
 .request-list {
   display: grid;
   gap: 6px;

@@ -227,6 +227,52 @@ export async function addCompanyWatchlistRequest(
   return { ok: true, message: `${companyName} added.` };
 }
 
+const roleFamilies = ["operations_strategy", "business_development", "early_career"];
+
+export async function addRolePreference(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const keyword = String(formData.get("keyword") || "").trim().toLowerCase();
+  const family = String(formData.get("family") || "");
+
+  if (!keyword) {
+    return { ok: false, message: "Enter a title or keyword." };
+  }
+  if (!roleFamilies.includes(family)) {
+    return { ok: false, message: "Pick a category." };
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase.from("role_preferences").insert({ keyword, family });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: true, message: `"${keyword}" is already in the list.` };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/");
+  return { ok: true, message: `Added "${keyword}".` };
+}
+
+export async function removeRolePreference(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    throw new Error("Invalid role preference");
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase.from("role_preferences").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();

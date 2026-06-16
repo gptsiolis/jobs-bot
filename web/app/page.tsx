@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { CompanyWatchlistMenu } from "@/components/company-watchlist-menu";
 import { JobsDashboard } from "@/components/jobs-dashboard";
+import { RolePreferencesMenu } from "@/components/role-preferences-menu";
 import { ScraperMenu } from "@/components/scraper-menu";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CompanyWatchlistRequest, JobRow, JobRun } from "@/lib/types";
+import type { CompanyWatchlistRequest, JobRow, JobRun, RolePreference } from "@/lib/types";
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
@@ -17,7 +18,8 @@ export default async function HomePage() {
   const [
     { data: jobs, error: jobsError },
     { data: runs },
-    { data: companyRequests }
+    { data: companyRequests },
+    { data: rolePreferences }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -37,7 +39,11 @@ export default async function HomePage() {
       .select("id,company_name,normalized_name,status,ats_config,last_checked_at,last_error,created_at")
       .in("status", ["pending", "resolved", "unresolved"])
       .order("created_at", { ascending: false })
-      .limit(8)
+      .limit(8),
+    supabase
+      .from("role_preferences")
+      .select("id,keyword,family")
+      .order("keyword", { ascending: true })
   ]);
 
   if (jobsError) {
@@ -55,6 +61,7 @@ export default async function HomePage() {
         </div>
         <div className="topbar-actions">
           <ScraperMenu initialRun={latestRun} />
+          <RolePreferencesMenu preferences={(rolePreferences || []) as RolePreference[]} />
           <CompanyWatchlistMenu
             companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
           />

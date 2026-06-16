@@ -55,6 +55,12 @@ export type JobRun = {
   failures: unknown[];
   error?: string | null;
 };
+export type RolePreference = {
+  id: string;
+  keyword: string;
+  family: "operations_strategy" | "business_development" | "early_career";
+};
+
 export type CompanyWatchlistRequest = {
   id: string;
   company_name: string;
