@@ -80,6 +80,30 @@ select {
   white-space: nowrap;
 }
 
+.stat-chip {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+  border-radius: 6px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.stat-chip strong {
+  font-size: 18px;
+  line-height: 38px;
+  color: var(--accent-strong);
+}
+
+.stat-chip .muted {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .run-chip strong {
   font-size: 13px;
 }

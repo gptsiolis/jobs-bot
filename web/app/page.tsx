@@ -19,7 +19,8 @@ export default async function HomePage() {
     { data: jobs, error: jobsError },
     { data: runs },
     { data: companyRequests },
-    { data: rolePreferences }
+    { data: rolePreferences },
+    { count: appliedTotal }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -43,7 +44,13 @@ export default async function HomePage() {
     supabase
       .from("role_preferences")
       .select("id,keyword,family")
-      .order("keyword", { ascending: true })
+      .order("keyword", { ascending: true }),
+    // Total jobs ever applied to - applied_at is stamped on entry to the applied
+    // funnel and survives later moves (messaged, next round, rejected).
+    supabase
+      .from("jobs")
+      .select("job_id", { count: "exact", head: true })
+      .not("applied_at", "is", null)
   ]);
 
   if (jobsError) {
@@ -60,6 +67,10 @@ export default async function HomePage() {
           <span>{auth.user.email}</span>
         </div>
         <div className="topbar-actions">
+          <div className="stat-chip" title="Total jobs you've ever applied to, including messaged, next round, and rejected">
+            <strong>{appliedTotal ?? 0}</strong>
+            <span className="muted">applied</span>
+          </div>
           <ScraperMenu initialRun={latestRun} />
           <RolePreferencesMenu preferences={(rolePreferences || []) as RolePreference[]} />
           <CompanyWatchlistMenu
