@@ -35,7 +35,7 @@ export function CompanyContacts({
   contacts: CompanyContact[];
 }) {
   const [state, action, pending] = useActionState(addCompanyContact, { ok: true, message: "" });
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   // Once the user types in the name field, stop auto-filling it from the URL.

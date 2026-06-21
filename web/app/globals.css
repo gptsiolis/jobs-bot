@@ -434,6 +434,20 @@ tbody tr.is-selected:hover {
   border-top: 1px solid var(--line);
 }
 
+/* When rendered inline as an expanded row under a job in the list, drop the
+   top divider/spacing and cap the width so it reads as a panel, not a column. */
+.contacts-row td {
+  background: var(--panel-soft);
+  padding: 12px 16px;
+}
+
+.contacts-row .contacts {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  max-width: 560px;
+}
+
 .contacts-toggle {
   width: 100%;
   display: flex;

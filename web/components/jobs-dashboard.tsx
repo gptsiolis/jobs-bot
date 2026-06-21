@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
   Bookmark,
@@ -226,12 +226,14 @@ function ReorderableJobList({
   jobs,
   status,
   selectedId,
-  onSelect
+  onSelect,
+  contacts
 }: {
   jobs: JobRow[];
   status: JobStatus;
   selectedId: string;
   onSelect: (jobId: string) => void;
+  contacts: CompanyContact[];
 }) {
   const [order, setOrder] = useState<JobRow[]>(jobs);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -239,6 +241,9 @@ function ReorderableJobList({
   const [pending, startTransition] = useTransition();
   const showApplied = status === "applied" || status === "applied_messaged";
   const showContact = status === "applied_messaged";
+  // reorder, #, score, role, company, location, sponsor, actions = 8, plus the
+  // optional applied/contact columns. Used to span the inline contacts row.
+  const columnCount = 8 + (showApplied ? 1 : 0) + (showContact ? 1 : 0);
 
   // Resync when the server sends a new list (revalidation, filtering, tab switch).
   useEffect(() => {
@@ -300,9 +305,13 @@ function ReorderableJobList({
             </tr>
           </thead>
           <tbody>
-            {order.map((job, index) => (
+            {order.map((job, index) => {
+              const showContacts =
+                job.job_id === selectedId &&
+                (job.status === "applied" || job.status === "applied_messaged");
+              return (
+              <Fragment key={job.job_id}>
               <tr
-                key={job.job_id}
                 draggable
                 onDragStart={(event) => {
                   setDragIndex(index);
@@ -378,7 +387,19 @@ function ReorderableJobList({
                   <JobActions job={job} />
                 </td>
               </tr>
-            ))}
+              {showContacts ? (
+                <tr className="contacts-row">
+                  <td colSpan={columnCount} onClick={(event) => event.stopPropagation()}>
+                    <CompanyContacts
+                      company={job.company}
+                      contacts={contacts.filter((contact) => contact.company === job.company)}
+                    />
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -530,6 +551,7 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
               status={status as JobStatus}
               selectedId={selected?.job_id || ""}
               onSelect={setSelectedId}
+              contacts={contacts}
             />
           ) : null}
           {!reorderable &&
@@ -669,12 +691,6 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
                 <a className="primary-button" href={selected.apply_url} target="_blank" rel="noreferrer">
                   Apply <ExternalLink size={15} />
                 </a>
-              ) : null}
-              {selected.status === "applied" || selected.status === "applied_messaged" ? (
-                <CompanyContacts
-                  company={selected.company}
-                  contacts={contacts.filter((contact) => contact.company === selected.company)}
-                />
               ) : null}
               {selected.ai_summary ? (
                 <p className="excerpt">{selected.ai_summary}</p>
