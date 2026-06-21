@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { ExternalLink, MessageSquareReply, Plus, X } from "lucide-react";
 import {
   addCompanyContact,
@@ -8,6 +8,24 @@ import {
   setContactResponded
 } from "@/app/actions";
 import type { CompanyContact } from "@/lib/types";
+
+// Best-guess a person's name from a LinkedIn profile URL. The /in/<slug> is
+// usually "first-last" with an optional alphanumeric hash suffix LinkedIn adds
+// to disambiguate. We strip the hash (any token containing a digit) and
+// title-case the rest. Returns "" for custom handles like /in/jsmith where the
+// guess would be unreliable, so we don't overwrite with junk.
+function nameFromLinkedinUrl(url: string): string {
+  const match = url.match(/linkedin\.com\/in\/([^/?#]+)/i);
+  if (!match) return "";
+  const slug = decodeURIComponent(match[1]);
+  const words = slug
+    .split("-")
+    .filter((word) => word && !/\d/.test(word));
+  if (words.length < 2) return "";
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
 
 export function CompanyContacts({
   company,
@@ -17,14 +35,26 @@ export function CompanyContacts({
   contacts: CompanyContact[];
 }) {
   const [state, action, pending] = useActionState(addCompanyContact, { ok: true, message: "" });
-  const formRef = useRef<HTMLFormElement>(null);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  // Once the user types in the name field, stop auto-filling it from the URL.
+  const [nameEdited, setNameEdited] = useState(false);
 
   // Clear the inputs once an add succeeds so the next person can be pasted in.
   useEffect(() => {
     if (state.ok && state.message) {
-      formRef.current?.reset();
+      setName("");
+      setUrl("");
+      setNameEdited(false);
     }
   }, [state]);
+
+  const handleUrlChange = (value: string) => {
+    setUrl(value);
+    if (!nameEdited) {
+      setName(nameFromLinkedinUrl(value));
+    }
+  };
 
   return (
     <div className="contacts">
@@ -37,14 +67,25 @@ export function CompanyContacts({
         next person you try.
       </p>
 
-      <form ref={formRef} action={action} className="contacts-add">
+      <form action={action} className="contacts-add">
         <input type="hidden" name="company" value={company} />
-        <input name="contact_name" placeholder="Name (optional)" autoComplete="off" />
+        <input
+          name="contact_name"
+          placeholder="Name (auto-filled from URL)"
+          autoComplete="off"
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setNameEdited(true);
+          }}
+        />
         <div className="contacts-add-row">
           <input
             name="linkedin_url"
             placeholder="LinkedIn profile URL"
             autoComplete="off"
+            value={url}
+            onChange={(event) => handleUrlChange(event.target.value)}
           />
           <button className="primary-button" type="submit" disabled={pending}>
             <Plus size={15} />
