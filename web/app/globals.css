@@ -428,6 +428,100 @@ tbody tr.is-selected:hover {
   overflow: auto;
 }
 
+.contacts {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.contacts-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.contacts-hint {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.contacts-add {
+  display: grid;
+  gap: 6px;
+}
+
+.contacts-add input {
+  width: 100%;
+}
+
+.contacts-add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.contacts-add-row input {
+  flex: 1;
+}
+
+.contacts-add-row .primary-button {
+  white-space: nowrap;
+}
+
+.contacts-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.contact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.contact.is-responded {
+  border-color: rgba(29, 127, 85, 0.45);
+  background: #eefaf4;
+}
+
+.contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.contact-actions .icon-button {
+  width: 30px;
+  min-height: 28px;
+}
+
+.icon-button.is-responded {
+  color: var(--good);
+  border-color: rgba(29, 127, 85, 0.45);
+  background: #eefaf4;
+}
+
 .login-shell {
   min-height: 100vh;
   display: grid;

@@ -61,6 +61,15 @@ export type RolePreference = {
   family: "operations_strategy" | "business_development" | "early_career";
 };
 
+export type CompanyContact = {
+  id: string;
+  company: string;
+  contact_name: string | null;
+  linkedin_url: string;
+  responded: boolean;
+  created_at: string;
+};
+
 export type CompanyWatchlistRequest = {
   id: string;
   company_name: string;

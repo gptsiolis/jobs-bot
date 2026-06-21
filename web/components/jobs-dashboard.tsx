@@ -19,7 +19,8 @@ import {
   setCompanyMessaged,
   updateJobStatus
 } from "@/app/actions";
-import type { JobRow, JobStatus } from "@/lib/types";
+import type { CompanyContact, JobRow, JobStatus } from "@/lib/types";
+import { CompanyContacts } from "./company-contacts";
 
 const roleFamilyMeta = [
   { value: "operations_strategy", label: "Operations · Strategy · Chief of Staff" },
@@ -385,7 +386,7 @@ function ReorderableJobList({
   );
 }
 
-export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
+export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: CompanyContact[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("active");
   const [sponsor, setSponsor] = useState("");
@@ -668,6 +669,12 @@ export function JobsDashboard({ jobs }: { jobs: JobRow[] }) {
                 <a className="primary-button" href={selected.apply_url} target="_blank" rel="noreferrer">
                   Apply <ExternalLink size={15} />
                 </a>
+              ) : null}
+              {selected.status === "applied" || selected.status === "applied_messaged" ? (
+                <CompanyContacts
+                  company={selected.company}
+                  contacts={contacts.filter((contact) => contact.company === selected.company)}
+                />
               ) : null}
               {selected.ai_summary ? (
                 <p className="excerpt">{selected.ai_summary}</p>

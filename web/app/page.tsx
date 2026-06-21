@@ -5,7 +5,13 @@ import { JobsDashboard } from "@/components/jobs-dashboard";
 import { RolePreferencesMenu } from "@/components/role-preferences-menu";
 import { ScraperMenu } from "@/components/scraper-menu";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CompanyWatchlistRequest, JobRow, JobRun, RolePreference } from "@/lib/types";
+import type {
+  CompanyContact,
+  CompanyWatchlistRequest,
+  JobRow,
+  JobRun,
+  RolePreference
+} from "@/lib/types";
 
 export default async function HomePage() {
   const supabase = await createSupabaseServerClient();
@@ -20,7 +26,8 @@ export default async function HomePage() {
     { data: runs },
     { data: companyRequests },
     { data: rolePreferences },
-    { count: appliedTotal }
+    { count: appliedTotal },
+    { data: companyContacts }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -50,7 +57,11 @@ export default async function HomePage() {
     supabase
       .from("jobs")
       .select("job_id", { count: "exact", head: true })
-      .not("applied_at", "is", null)
+      .not("applied_at", "is", null),
+    supabase
+      .from("company_contacts")
+      .select("id,company,contact_name,linkedin_url,responded,created_at")
+      .order("created_at", { ascending: true })
   ]);
 
   if (jobsError) {
@@ -84,7 +95,10 @@ export default async function HomePage() {
         </div>
       </header>
       <main className="main">
-        <JobsDashboard jobs={(jobs || []) as JobRow[]} />
+        <JobsDashboard
+          jobs={(jobs || []) as JobRow[]}
+          contacts={(companyContacts || []) as CompanyContact[]}
+        />
       </main>
     </div>
   );

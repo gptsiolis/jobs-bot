@@ -115,6 +115,90 @@ export async function setCompanyContactResponded(formData: FormData) {
   revalidatePath("/");
 }
 
+// Normalize a LinkedIn profile URL: trim, drop tracking query/hash, ensure a
+// scheme so the stored value is always a clickable link.
+function normalizeLinkedinUrl(value: string) {
+  let url = value.trim();
+  if (!url) return "";
+  url = url.replace(/[?#].*$/, "").replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url.replace(/^\/+/, "");
+  }
+  return url;
+}
+
+export async function addCompanyContact(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const company = String(formData.get("company") || "").trim();
+  const contactName = String(formData.get("contact_name") || "").trim();
+  const linkedinUrl = normalizeLinkedinUrl(String(formData.get("linkedin_url") || ""));
+
+  if (!company) {
+    return { ok: false, message: "Missing company." };
+  }
+  if (!linkedinUrl) {
+    return { ok: false, message: "Paste the person's LinkedIn URL." };
+  }
+  if (!/linkedin\.com/i.test(linkedinUrl)) {
+    return { ok: false, message: "That doesn't look like a LinkedIn URL." };
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase.from("company_contacts").insert({
+    company,
+    contact_name: contactName || null,
+    linkedin_url: linkedinUrl
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { ok: true, message: "That person is already on the list." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/");
+  return { ok: true, message: `Added ${contactName || "contact"}.` };
+}
+
+export async function setContactResponded(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  const responded = String(formData.get("responded") || "") === "true";
+  if (!id) {
+    throw new Error("Invalid contact");
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase
+    .from("company_contacts")
+    .update({ responded })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+export async function removeCompanyContact(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    throw new Error("Invalid contact");
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase.from("company_contacts").delete().eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
 const reorderableStatuses: JobStatus[] = ["saved", "applied", "applied_messaged"];
 
 export async function reorderJobs(status: JobStatus, orderedIds: string[]) {
