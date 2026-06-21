@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { ExternalLink, MessageSquareReply, Plus, X } from "lucide-react";
+import { ChevronDown, ExternalLink, MessageSquareReply, Plus, X } from "lucide-react";
 import {
   addCompanyContact,
   removeCompanyContact,
@@ -35,6 +35,7 @@ export function CompanyContacts({
   contacts: CompanyContact[];
 }) {
   const [state, action, pending] = useActionState(addCompanyContact, { ok: true, message: "" });
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   // Once the user types in the name field, stop auto-filling it from the URL.
@@ -57,11 +58,22 @@ export function CompanyContacts({
   };
 
   return (
-    <div className="contacts">
-      <h3 className="contacts-title">
-        People messaged
-        <span className="muted"> · {contacts.length}</span>
-      </h3>
+    <div className={open ? "contacts is-open" : "contacts"}>
+      <button
+        type="button"
+        className="contacts-toggle"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span>
+          People messaged
+          <span className="muted"> · {contacts.length}</span>
+        </span>
+        <ChevronDown size={16} className="contacts-chevron" />
+      </button>
+
+      {open ? (
+        <div className="contacts-body">
       <p className="muted contacts-hint">
         Track who you&apos;ve reached out to on LinkedIn. If they don&apos;t reply, add the
         next person you try.
@@ -109,38 +121,44 @@ export function CompanyContacts({
                 target="_blank"
                 rel="noreferrer"
               >
-                {contact.contact_name || contact.linkedin_url}
-                <ExternalLink size={13} />
+                <span className="contact-name">{contact.contact_name || contact.linkedin_url}</span>
+                <ExternalLink size={13} className="contact-link-icon" />
               </a>
-              {contact.responded ? <span className="pill fit-strong">Replied</span> : null}
-              <div className="contact-actions">
-                <form action={setContactResponded}>
-                  <input type="hidden" name="id" value={contact.id} />
-                  <input type="hidden" name="responded" value={contact.responded ? "false" : "true"} />
-                  <button
-                    className={contact.responded ? "icon-button is-responded" : "icon-button"}
-                    type="submit"
-                    title={contact.responded ? "Mark as no reply yet" : "Mark as replied"}
-                    aria-label={contact.responded ? "Mark as no reply yet" : "Mark as replied"}
-                  >
-                    <MessageSquareReply size={14} />
-                  </button>
-                </form>
-                <form action={removeCompanyContact}>
-                  <input type="hidden" name="id" value={contact.id} />
-                  <button
-                    className="icon-button"
-                    type="submit"
-                    title="Remove contact"
-                    aria-label="Remove contact"
-                  >
-                    <X size={14} />
-                  </button>
-                </form>
+              <div className="contact-meta">
+                <span className={contact.responded ? "contact-status is-responded" : "contact-status"}>
+                  {contact.responded ? "Replied" : "No reply yet"}
+                </span>
+                <div className="contact-actions">
+                  <form action={setContactResponded}>
+                    <input type="hidden" name="id" value={contact.id} />
+                    <input type="hidden" name="responded" value={contact.responded ? "false" : "true"} />
+                    <button
+                      className={contact.responded ? "icon-button is-responded" : "icon-button"}
+                      type="submit"
+                      title={contact.responded ? "Mark as no reply yet" : "Mark as replied"}
+                      aria-label={contact.responded ? "Mark as no reply yet" : "Mark as replied"}
+                    >
+                      <MessageSquareReply size={14} />
+                    </button>
+                  </form>
+                  <form action={removeCompanyContact}>
+                    <input type="hidden" name="id" value={contact.id} />
+                    <button
+                      className="icon-button"
+                      type="submit"
+                      title="Remove contact"
+                      aria-label="Remove contact"
+                    >
+                      <X size={14} />
+                    </button>
+                  </form>
+                </div>
               </div>
             </li>
           ))}
         </ul>
+      ) : null}
+        </div>
       ) : null}
     </div>
   );
