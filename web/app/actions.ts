@@ -165,6 +165,7 @@ export async function addCompanyContact(
 
 export async function setContactResponded(formData: FormData) {
   const id = String(formData.get("id") || "");
+  const company = String(formData.get("company") || "");
   const responded = String(formData.get("responded") || "") === "true";
   if (!id) {
     throw new Error("Invalid contact");
@@ -178,6 +179,33 @@ export async function setContactResponded(formData: FormData) {
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  // Bubble the reply up to the job: marking a person as replied flips the
+  // company's applied_messaged roles from "Awaiting" to "Responded". When
+  // un-marking, only fall back to "Awaiting" if no one else at the company has
+  // replied either.
+  if (company) {
+    let jobResponded = responded;
+    if (!responded) {
+      const { data: others } = await supabase
+        .from("company_contacts")
+        .select("id")
+        .eq("company", company)
+        .eq("responded", true)
+        .limit(1);
+      jobResponded = Boolean(others && others.length);
+    }
+
+    const { error: jobError } = await supabase
+      .from("jobs")
+      .update({ contact_responded: jobResponded })
+      .eq("company", company)
+      .eq("status", "applied_messaged");
+
+    if (jobError) {
+      throw new Error(jobError.message);
+    }
   }
 
   revalidatePath("/");

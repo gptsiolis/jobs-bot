@@ -143,6 +143,7 @@ export function CompanyContacts({
                 <div className="contact-actions">
                   <form action={setContactResponded}>
                     <input type="hidden" name="id" value={contact.id} />
+                    <input type="hidden" name="company" value={company} />
                     <input type="hidden" name="responded" value={contact.responded ? "false" : "true"} />
                     <button
                       className={contact.responded ? "icon-button is-responded" : "icon-button"}
