@@ -35,7 +35,8 @@ export function CompanyContacts({
   contacts: CompanyContact[];
 }) {
   const [state, action, pending] = useActionState(addCompanyContact, { ok: true, message: "" });
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   // Once the user types in the name field, stop auto-filling it from the URL.
@@ -79,32 +80,43 @@ export function CompanyContacts({
         next person you try.
       </p>
 
-      <form action={action} className="contacts-add">
-        <input type="hidden" name="company" value={company} />
-        <input
-          name="contact_name"
-          placeholder="Name (auto-filled from URL)"
-          autoComplete="off"
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            setNameEdited(true);
-          }}
-        />
-        <div className="contacts-add-row">
+      {adding ? (
+        <form action={action} className="contacts-add">
+          <input type="hidden" name="company" value={company} />
           <input
-            name="linkedin_url"
-            placeholder="LinkedIn profile URL"
+            name="contact_name"
+            placeholder="Name (auto-filled from URL)"
             autoComplete="off"
-            value={url}
-            onChange={(event) => handleUrlChange(event.target.value)}
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              setNameEdited(true);
+            }}
           />
-          <button className="primary-button" type="submit" disabled={pending}>
-            <Plus size={15} />
-            Add
-          </button>
-        </div>
-      </form>
+          <div className="contacts-add-row">
+            <input
+              name="linkedin_url"
+              placeholder="LinkedIn profile URL"
+              autoComplete="off"
+              value={url}
+              onChange={(event) => handleUrlChange(event.target.value)}
+            />
+            <button className="primary-button" type="submit" disabled={pending}>
+              <Plus size={15} />
+              Add
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="primary-button contacts-add-toggle"
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={15} />
+          Add
+        </button>
+      )}
       {state.message ? (
         <span className={state.ok ? "action-message" : "action-message is-error"}>
           {state.message}
