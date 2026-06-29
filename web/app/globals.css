@@ -1078,3 +1078,98 @@ tbody tr.is-selected:hover {
   gap: 8px;
   font-size: 13px;
 }
+
+/* Email agent's suggested status changes, shown above the job list. */
+.status-suggestions {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+}
+
+.status-suggestions-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.status-suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.status-suggestion {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-soft);
+}
+
+.status-suggestion-main {
+  min-width: 0;
+}
+
+.status-suggestion-job {
+  font-size: 14px;
+}
+
+.status-suggestion-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.status-suggestion-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 360px;
+}
+
+.status-suggestion-evidence {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #3d403a;
+  line-height: 1.4;
+}
+
+.pill.pill-next_round {
+  color: var(--accent);
+  border-color: rgba(11, 107, 203, 0.35);
+  background: #eaf3fc;
+}
+
+.pill.pill-rejected {
+  color: var(--bad);
+  border-color: rgba(163, 58, 52, 0.3);
+  background: #fff1ef;
+}
+
+.status-suggestion-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.status-suggestion-actions .status-button {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+}

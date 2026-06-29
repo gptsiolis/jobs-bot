@@ -1,0 +1,75 @@
+"use client";
+
+import { CheckCircle2, Mail, XCircle } from "lucide-react";
+import { applyStatusSuggestion, dismissStatusSuggestion } from "@/app/actions";
+import type { StatusSuggestion } from "@/lib/types";
+
+const statusLabels: Record<string, string> = {
+  next_round: "Next Round",
+  rejected: "Rejected"
+};
+
+// Suggested status changes the email agent surfaced but did not auto-apply
+// (lower confidence). Each is one inbound email proposing one job moves to
+// Next Round or Rejected; the user approves or dismisses.
+export function StatusSuggestions({ suggestions }: { suggestions: StatusSuggestion[] }) {
+  if (!suggestions.length) {
+    return null;
+  }
+
+  return (
+    <section className="status-suggestions">
+      <div className="status-suggestions-head">
+        <Mail size={16} />
+        <span>Suggested updates from your inbox</span>
+        <span className="muted">{suggestions.length}</span>
+      </div>
+      <ul className="status-suggestions-list">
+        {suggestions.map((s) => {
+          const company = s.jobs?.company || "";
+          const title = s.jobs?.title || s.job_id;
+          const pct = Math.round((s.confidence || 0) * 100);
+          return (
+            <li key={s.id} className="status-suggestion">
+              <div className="status-suggestion-main">
+                <div className="status-suggestion-job">
+                  <strong>{title}</strong>
+                  {company ? <span className="muted"> — {company}</span> : null}
+                </div>
+                <div className="status-suggestion-meta">
+                  <span className={`pill pill-${s.suggested_status}`}>
+                    {statusLabels[s.suggested_status] || s.suggested_status}
+                  </span>
+                  <span className="muted">{pct}% confident</span>
+                  {s.email_subject ? (
+                    <span className="muted status-suggestion-subject" title={s.email_subject}>
+                      “{s.email_subject}”
+                    </span>
+                  ) : null}
+                </div>
+                {s.evidence ? <p className="status-suggestion-evidence">{s.evidence}</p> : null}
+              </div>
+              <div className="status-suggestion-actions">
+                <form action={applyStatusSuggestion}>
+                  <input type="hidden" name="id" value={s.id} />
+                  <input type="hidden" name="job_id" value={s.job_id} />
+                  <input type="hidden" name="suggested_status" value={s.suggested_status} />
+                  <button className="status-button" type="submit" title="Apply this update">
+                    <CheckCircle2 size={16} />
+                    <span>Apply</span>
+                  </button>
+                </form>
+                <form action={dismissStatusSuggestion}>
+                  <input type="hidden" name="id" value={s.id} />
+                  <button className="status-button" type="submit" title="Dismiss">
+                    <XCircle size={16} />
+                  </button>
+                </form>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

@@ -14,11 +14,13 @@ on:
           - job_search
           - source_expansion
           - all
+          - email_sync
   schedule:
     - cron: "0 19 * * *"
     - cron: "40 19 * * *"
     - cron: "20 20 * * *"
     - cron: "0 21 * * 0"
+    - cron: "30 13 * * *"
 
 jobs:
   scrape:
@@ -38,6 +40,11 @@ jobs:
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       AI_BATCH_SIZE: ${{ vars.AI_BATCH_SIZE }}
       AI_DAILY_JOB_LIMIT: ${{ vars.AI_DAILY_JOB_LIMIT }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+      GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+      GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+      GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,9 +72,16 @@ jobs:
             echo "mode=job_search" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.schedule }}" = "40 19 * * *" ]; then
             echo "mode=discovery" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "30 13 * * *" ]; then
+            echo "mode=email_sync" >> "$GITHUB_OUTPUT"
           else
             echo "mode=watchlist" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Run email status sync
+        if: steps.mode.outputs.mode == 'email_sync'
+        run: python email_sync.py
+
       - name: Run scraper sync
+        if: steps.mode.outputs.mode != 'email_sync'
         run: python jobs.py sync "${{ steps.mode.outputs.mode }}"

@@ -61,6 +61,57 @@ export async function updateJobStatus(formData: FormData) {
   revalidatePath("/");
 }
 
+// The email agent proposes status changes it wasn't confident enough to apply
+// on its own. Approving one flips the job's status (audited by the same trigger
+// as a manual change) and closes the suggestion; dismissing just closes it.
+export async function applyStatusSuggestion(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  const jobId = String(formData.get("job_id") || "");
+  const status = String(formData.get("suggested_status") || "") as JobStatus;
+
+  if (!id || !jobId || !allowedStatuses.includes(status)) {
+    throw new Error("Invalid status suggestion");
+  }
+
+  const supabase = await requireUser();
+
+  const { error: jobError } = await supabase
+    .from("jobs")
+    .update({ status })
+    .eq("job_id", jobId);
+  if (jobError) {
+    throw new Error(jobError.message);
+  }
+
+  const { error } = await supabase
+    .from("status_suggestions")
+    .update({ resolved: true, resolution: "applied", resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
+export async function dismissStatusSuggestion(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    throw new Error("Invalid status suggestion");
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase
+    .from("status_suggestions")
+    .update({ resolved: true, resolution: "dismissed", resolved_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/");
+}
+
 // A single LinkedIn message covers a whole company, so messaging is tracked
 // per company: toggling it moves every applied role at that company into (or
 // out of) the applied_messaged bucket together.

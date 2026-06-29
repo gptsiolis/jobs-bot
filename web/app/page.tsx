@@ -4,13 +4,15 @@ import { CompanyWatchlistMenu } from "@/components/company-watchlist-menu";
 import { JobsDashboard } from "@/components/jobs-dashboard";
 import { RolePreferencesMenu } from "@/components/role-preferences-menu";
 import { ScraperMenu } from "@/components/scraper-menu";
+import { StatusSuggestions } from "@/components/status-suggestions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   CompanyContact,
   CompanyWatchlistRequest,
   JobRow,
   JobRun,
-  RolePreference
+  RolePreference,
+  StatusSuggestion
 } from "@/lib/types";
 
 export default async function HomePage() {
@@ -27,7 +29,8 @@ export default async function HomePage() {
     { data: companyRequests },
     { data: rolePreferences },
     { count: appliedTotal },
-    { data: companyContacts }
+    { data: companyContacts },
+    { data: statusSuggestions }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -61,7 +64,14 @@ export default async function HomePage() {
     supabase
       .from("company_contacts")
       .select("id,company,contact_name,linkedin_url,responded,created_at")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("status_suggestions")
+      .select(
+        "id,job_id,suggested_status,current_status,decision,confidence,evidence,email_subject,email_from,created_at,jobs(title,company)"
+      )
+      .eq("resolved", false)
+      .order("created_at", { ascending: false })
   ]);
 
   if (jobsError) {
@@ -95,6 +105,9 @@ export default async function HomePage() {
         </div>
       </header>
       <main className="main">
+        <StatusSuggestions
+          suggestions={(statusSuggestions || []) as unknown as StatusSuggestion[]}
+        />
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}
           contacts={(companyContacts || []) as CompanyContact[]}

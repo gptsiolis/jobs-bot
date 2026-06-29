@@ -70,6 +70,20 @@ export type CompanyContact = {
   created_at: string;
 };
 
+export type StatusSuggestion = {
+  id: string;
+  job_id: string;
+  suggested_status: Extract<JobStatus, "next_round" | "rejected">;
+  current_status: string | null;
+  decision: string;
+  confidence: number;
+  evidence: string | null;
+  email_subject: string | null;
+  email_from: string | null;
+  created_at: string;
+  jobs: { title: string; company: string } | null;
+};
+
 export type CompanyWatchlistRequest = {
   id: string;
   company_name: string;

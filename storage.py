@@ -24,6 +24,9 @@ JOB_STATUSES = (
     "archived",
 )
 JOB_VISIBILITIES = ("default", "hidden", "needs_review")
+# Statuses a job can hold while an inbound email might still move it forward or
+# end it. Used by the email status updater to scope which jobs to match against.
+INFLIGHT_STATUSES = ("applied", "applied_messaged", "next_round")
 WATCHLIST_SOURCE_PREFIXES = (
     "greenhouse:",
     "lever:",
@@ -435,4 +438,78 @@ class SupabaseJobStore:
             f"/rest/v1/company_watchlist_requests?id=eq.{quote(str(request_id), safe='')}",
             headers={"Prefer": "return=minimal"},
             json=payload,
+        )
+
+    # --- Email status updater -------------------------------------------------
+
+    def list_inflight_jobs(self):
+        """Jobs that can still receive a status update from an inbound email."""
+        statuses = ",".join(INFLIGHT_STATUSES)
+        return self._request(
+            "GET",
+            "/rest/v1/jobs"
+            "?select=job_id,title,company,status,apply_url,ats,source,applied_at"
+            f"&status=in.({statuses})"
+            "&order=applied_at.desc.nullslast",
+        ) or []
+
+    def processed_message_ids(self, message_ids):
+        """Return the subset of message ids already handled in a prior run."""
+        ids = [m for m in message_ids if m]
+        if not ids:
+            return set()
+        in_list = ",".join(quote(str(m), safe="") for m in ids)
+        rows = self._request(
+            "GET",
+            f"/rest/v1/processed_emails?select=message_id&message_id=in.({in_list})",
+        ) or []
+        return {row["message_id"] for row in rows}
+
+    def record_processed_email(self, message_id, thread_id=None, job_id=None,
+                               decision=None, confidence=None):
+        if not message_id:
+            return None
+        return self._request(
+            "POST",
+            "/rest/v1/processed_emails?on_conflict=message_id",
+            headers={"Prefer": "return=minimal,resolution=ignore-duplicates"},
+            json={
+                "message_id": message_id,
+                "thread_id": thread_id,
+                "job_id": job_id,
+                "decision": decision,
+                "confidence": confidence,
+            },
+        )
+
+    def set_job_status(self, job_id, status):
+        return self._request(
+            "PATCH",
+            f"/rest/v1/jobs?job_id=eq.{quote(str(job_id), safe='')}",
+            headers={"Prefer": "return=minimal"},
+            json={"status": status},
+        )
+
+    def log_job_note_event(self, job_id, event_type, old_status, new_status, notes):
+        """Record an annotated status change so the audit trail keeps the
+        email evidence alongside the bare change the trigger already logs."""
+        return self._request(
+            "POST",
+            "/rest/v1/job_events",
+            headers={"Prefer": "return=minimal"},
+            json={
+                "job_id": job_id,
+                "event_type": event_type,
+                "old_status": old_status,
+                "new_status": new_status,
+                "notes": notes,
+            },
+        )
+
+    def insert_status_suggestion(self, suggestion):
+        return self._request(
+            "POST",
+            "/rest/v1/status_suggestions?on_conflict=gmail_message_id,job_id",
+            headers={"Prefer": "return=minimal,resolution=ignore-duplicates"},
+            json=suggestion,
         )
