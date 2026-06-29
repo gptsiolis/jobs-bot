@@ -112,23 +112,16 @@ def scrape_company(company_name, slug, brand_filter=None, segment_filter=None):
     raw = _fetch(slug)
     if not raw:
         return []
-    matched = []
-    for posting in raw:
-        if brand_filter and _custom_field_value(posting, "Brands") != brand_filter:
-            continue
-        if segment_filter and _custom_field_value(posting, "Business Segment") != segment_filter:
-            continue
-        normalized = _normalize_job(posting, company_name, slug)
-        location_blob = " ".join(normalized["locations"])
-        description = normalized.get("job_description", "")
-        if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"],
-            description,
-        ):
-            continue
-        filters.add_fit_metadata(normalized, description)
-        matched.append(normalized)
-    return matched
+
+    def _selected(postings):
+        for posting in postings:
+            if brand_filter and _custom_field_value(posting, "Brands") != brand_filter:
+                continue
+            if segment_filter and _custom_field_value(posting, "Business Segment") != segment_filter:
+                continue
+            yield _normalize_job(posting, company_name, slug)
+
+    return filters.match_watchlist_jobs(_selected(raw))
 
 
 def scrape_all(company_boards):

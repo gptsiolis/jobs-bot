@@ -21,10 +21,16 @@ from company_registry import (
 )
 from scrapers import (
     getro, consider, yc, wellfound, greenhouse, lever, ashby, workday,
-    workable, smartrecruiters, dayforce, board_resolver, job_search,
+    workable, smartrecruiters, dayforce, breezy, phenom, board_resolver,
+    job_search,
 )
 from scrapers.filters import FIT_BUCKET_LABELS, add_fit_metadata
-from storage import SupabaseJobStore, counts_by_source, normalize_job_record
+from storage import (
+    SupabaseJobStore,
+    counts_by_source,
+    job_location_string,
+    normalize_job_record,
+)
 import ai_ranker
 import company_leads
 
@@ -39,7 +45,7 @@ FIT_BUCKET_ORDER = ("strong", "possible", "unknown")
 def _render_job(job):
     title = job.get("job_title", "N/A")
     company = job.get("employer_name", "N/A")
-    location = _job_location_string(job)
+    location = job_location_string(job)
     link = job.get("job_apply_link", "#")
     reasons = job.get("fit_reasons") or []
     sponsor = sponsor_label(job.get("sponsor_tier"))
@@ -124,22 +130,6 @@ def deduplicate(jobs, seen_ids):
     return unique
 
 
-def _job_location_string(job):
-    """Build the display-ready location string for a job."""
-    locations = job.get("locations", [])
-    city = job.get("job_city", "")
-    state = job.get("job_state", "")
-    if locations:
-        location = ", ".join(locations)
-    elif city or state:
-        location = ", ".join(p for p in [city, state] if p)
-    else:
-        location = "Unknown"
-    if job.get("job_is_remote") or job.get("work_mode") == "remote":
-        location = f"{location} (Remote)" if location != "Unknown" else "Remote"
-    return location
-
-
 def _categorize_metro(location_blob):
     blob = (location_blob or "").lower()
     if "remote" in blob:
@@ -184,8 +174,8 @@ def send_email(jobs, heading, subject_prefix):
     # Metro breakdown for the email header
     metro_counts = {}
     for job in jobs:
-        loc = _job_location_string(job)
-        metro_counts[_categorize_metro(loc)] = metro_counts.get(_categorize_metro(loc), 0) + 1
+        metro = _categorize_metro(job_location_string(job))
+        metro_counts[metro] = metro_counts.get(metro, 0) + 1
 
     by_bucket = {}
     for job in jobs:
@@ -388,6 +378,8 @@ def collect_watchlist_jobs(store=None):
     all_jobs.extend(workable.scrape_all(company_boards))
     all_jobs.extend(smartrecruiters.scrape_all(company_boards))
     all_jobs.extend(dayforce.scrape_all(company_boards))
+    all_jobs.extend(breezy.scrape_all(company_boards))
+    all_jobs.extend(phenom.scrape_all(company_boards))
 
     _apply_board_metadata(all_jobs, company_boards)
     return _prepare_jobs(all_jobs)
@@ -424,13 +416,17 @@ _ATS_TO_MODULE = {
     "workable": workable,
     "smartrecruiters": smartrecruiters,
     "dayforce": dayforce,
+    "breezy": breezy,
+    "phenom": phenom,
 }
 
 
 def _scraper_failures():
     failures = []
-    if hasattr(ashby, "get_failures"):
-        failures.extend(ashby.get_failures())
+    for module in (getro, consider, yc, wellfound, greenhouse, lever, ashby,
+                   workday, workable, smartrecruiters, dayforce, breezy, phenom):
+        if hasattr(module, "get_failures"):
+            failures.extend(module.get_failures())
     return failures
 
 
@@ -553,7 +549,7 @@ def run_test(company_query):
         sys.exit(1)
 
     print(f"Testing {matched_name} via {ats}...")
-    if ats == "workday":
+    if ats in ("workday", "phenom"):
         jobs = module.scrape_company(matched_name, cfg)
     elif ats == "greenhouse":
         jobs = module.scrape_company(matched_name, cfg["slug"], cfg.get("bu_filter"))

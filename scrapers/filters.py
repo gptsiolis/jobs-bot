@@ -570,6 +570,34 @@ def passes_discovery(title, location_blob, employer_name, description=""):
     return fit_metadata(title, description).get("fit_bucket") != "reject"
 
 
+def match_jobs(normalized_jobs, passes):
+    """Filter already-normalized job dicts and attach fit metadata to keepers.
+
+    Shared by the per-company watchlist scrapers (and discovery scrapers),
+    which all ran the identical normalize -> filter -> add_fit_metadata loop.
+    `passes` is one of passes_watchlist / passes_discovery.
+    """
+    matched = []
+    for normalized in normalized_jobs:
+        location_blob = " ".join(normalized.get("locations") or [])
+        description = normalized.get("job_description", "")
+        if not passes(
+            normalized.get("job_title", ""),
+            location_blob,
+            normalized.get("employer_name", ""),
+            description,
+        ):
+            continue
+        add_fit_metadata(normalized, description)
+        matched.append(normalized)
+    return matched
+
+
+def match_watchlist_jobs(normalized_jobs):
+    """match_jobs bound to the watchlist filter."""
+    return match_jobs(normalized_jobs, passes_watchlist)
+
+
 def passes_watchlist(title, location_blob, employer_name, description=""):
     """Filter for the per-company watchlist path (Greenhouse, Lever, etc.).
 

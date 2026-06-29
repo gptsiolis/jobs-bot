@@ -177,6 +177,9 @@
     {"name": "Wiz", "sector": "infra_devtools", "quality_tier": "excellent", "sponsor_tier": "strong_history", "enabled": false},
     {"name": "Workato", "sector": "saas", "quality_tier": "strong", "sponsor_tier": "strong_history", "ats": {"type": "greenhouse", "slug": "workato"}},
     {"name": "Yext", "sector": "saas", "quality_tier": "strong", "sponsor_tier": "strong_history", "ats": {"type": "greenhouse", "slug": "yext"}},
-    {"name": "Zocdoc", "sector": "consumer_health", "quality_tier": "strong", "sponsor_tier": "strong_history", "ats": {"type": "greenhouse", "slug": "zocdoc"}}
+    {"name": "Zocdoc", "sector": "consumer_health", "quality_tier": "strong", "sponsor_tier": "strong_history", "ats": {"type": "greenhouse", "slug": "zocdoc"}},
+    {"name": "Arrived", "sector": "fintech_crypto", "quality_tier": "acceptable", "sponsor_tier": "unknown_no_ban", "source_notes": "Breezy HR board; slug unverified (try 'arrivedhomes' if 'arrived' yields zero)", "ats": {"type": "breezy", "slug": "arrived"}},
+    {"name": "Circle", "sector": "fintech_crypto", "quality_tier": "excellent", "sponsor_tier": "strong_history", "source_notes": "Phenom People (browser); verify search_path on first real run", "ats": {"type": "phenom", "host": "https://careers.circle.com", "search_path": "/us/en/search-results"}},
+    {"name": "eBay", "sector": "commerce_marketplaces", "quality_tier": "strong", "sponsor_tier": "strong_history", "source_notes": "Phenom People (browser); verify search_path on first real run", "ats": {"type": "phenom", "host": "https://careers.ebayinc.com", "search_path": "/us/en/search-results"}}
   ]
 }

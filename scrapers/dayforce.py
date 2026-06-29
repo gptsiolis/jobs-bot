@@ -90,23 +90,17 @@ def scrape_company(company_name, company, board_code=None):
     raw = _fetch(company, board_code=board_code)
     if not raw:
         return []
-    matched = []
-    seen_ids = set()
-    for job in raw:
-        normalized = _normalize_job(job, company_name, company)
-        if normalized["job_id"] in seen_ids:
-            continue
-        seen_ids.add(normalized["job_id"])
-        location_blob = " ".join(normalized["locations"])
-        description = normalized.get("job_description", "")
-        if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"],
-            description,
-        ):
-            continue
-        filters.add_fit_metadata(normalized, description)
-        matched.append(normalized)
-    return matched
+
+    def _deduped(jobs):
+        seen_ids = set()
+        for job in jobs:
+            normalized = _normalize_job(job, company_name, company)
+            if normalized["job_id"] in seen_ids:
+                continue
+            seen_ids.add(normalized["job_id"])
+            yield normalized
+
+    return filters.match_watchlist_jobs(_deduped(raw))
 
 
 def scrape_all(company_boards):

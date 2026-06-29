@@ -70,44 +70,30 @@ def scrape_board(board_url, vc_name, role_queries, skip_seniority):
     Returns:
         List of normalized job dicts.
     """
-    seen_ids = set()
-    matched_jobs = []
-
-    for query in role_queries:
-        url = f"{board_url}/jobs?q={query}"
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            print(f"  [!] Failed to fetch {vc_name} for '{query}': {e}")
-            continue
-
-        data = _extract_next_data(resp.text)
-        if not data:
-            print(f"  [!] No __NEXT_DATA__ found on {vc_name} for '{query}'")
-            continue
-
-        raw_jobs = _parse_jobs(data)
-
-        for job in raw_jobs:
-            job_id = job.get("id")
-            if job_id in seen_ids:
-                continue
-            seen_ids.add(job_id)
-
-            normalized = _normalize_job(job, vc_name)
-            location_blob = " ".join(normalized["locations"])
-            description = normalized.get("job_description", "")
-            if not filters.passes_discovery(
-                normalized["job_title"], location_blob, normalized["employer_name"],
-                description,
-            ):
+    def _normalized_jobs():
+        seen_ids = set()
+        for query in role_queries:
+            url = f"{board_url}/jobs?q={query}"
+            try:
+                resp = requests.get(url, headers=HEADERS, timeout=15)
+                resp.raise_for_status()
+            except requests.RequestException as e:
+                print(f"  [!] Failed to fetch {vc_name} for '{query}': {e}")
                 continue
 
-            filters.add_fit_metadata(normalized, description)
-            matched_jobs.append(normalized)
+            data = _extract_next_data(resp.text)
+            if not data:
+                print(f"  [!] No __NEXT_DATA__ found on {vc_name} for '{query}'")
+                continue
 
-    return matched_jobs
+            for job in _parse_jobs(data):
+                job_id = job.get("id")
+                if job_id in seen_ids:
+                    continue
+                seen_ids.add(job_id)
+                yield _normalize_job(job, vc_name)
+
+    return filters.match_jobs(_normalized_jobs(), filters.passes_discovery)
 
 
 def scrape_all(boards, role_queries, skip_seniority):

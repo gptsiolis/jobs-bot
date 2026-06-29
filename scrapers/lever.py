@@ -72,19 +72,9 @@ def scrape_company(company_name, slug):
     raw_jobs = _fetch(slug)
     if not raw_jobs:
         return []
-    matched = []
-    for job in raw_jobs:
-        normalized = _normalize_job(job, company_name)
-        location_blob = " ".join(normalized["locations"])
-        description = normalized.get("job_description", "")
-        if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"],
-            description,
-        ):
-            continue
-        filters.add_fit_metadata(normalized, description)
-        matched.append(normalized)
-    return matched
+    return filters.match_watchlist_jobs(
+        _normalize_job(job, company_name) for job in raw_jobs
+    )
 
 
 def scrape_all(company_boards):

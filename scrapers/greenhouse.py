@@ -86,22 +86,11 @@ def scrape_company(company_name, slug, bu_filter=None):
     raw_jobs = _fetch(slug, need_metadata=bool(bu_filter))
     if not raw_jobs:
         return []
-
-    matched = []
-    for job in raw_jobs:
-        if bu_filter and _job_business_unit(job) != bu_filter:
-            continue
-        normalized = _normalize_job(job, company_name)
-        location_blob = " ".join(normalized["locations"])
-        description = normalized.get("job_description", "")
-        if not filters.passes_watchlist(
-            normalized["job_title"], location_blob, normalized["employer_name"],
-            description,
-        ):
-            continue
-        filters.add_fit_metadata(normalized, description)
-        matched.append(normalized)
-    return matched
+    return filters.match_watchlist_jobs(
+        _normalize_job(job, company_name)
+        for job in raw_jobs
+        if not bu_filter or _job_business_unit(job) == bu_filter
+    )
 
 
 def scrape_all(company_boards):

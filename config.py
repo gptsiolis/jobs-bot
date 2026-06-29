@@ -274,247 +274,35 @@ LOCATION_ALLOW = {
 # If True, remote roles pass the location filter regardless of metro.
 ALLOW_REMOTE = True
 
-# ── Company allowlist (manifest only) ───────────────────────
-# Note: this list is NOT actively used by the current filters. It's a
-# manifest of companies we care about — useful for our own reference and
-# for figuring out what to wire up in COMPANY_BOARDS below. The actual
-# watchlist scrape is driven by COMPANY_BOARDS, which only contains
-# companies whose ATS slug we've verified.
+# ── Company allowlist & per-company ATS boards ──────────────────
+# Both are sourced from the curated registry in data/company_registry.json
+# (see company_registry.py). COMPANY_ALLOWLIST is {sector: [names]};
+# COMPANY_BOARDS is {name: ats config} for enabled companies that have a
+# verified, sponsor-friendly ATS slug. Edit the registry JSON, not this file,
+# to change which companies are tracked.
 #
-# If we later want to filter discovery-mode aggregator results to only
-# these names, filters.is_allowed_company is ready — just wire it in.
-COMPANY_ALLOWLIST = {
-    "media_entertainment": [
-        "A24",
-        "Agentio",
-        "Christie's",
-        "Discord",
-        "Disney",
-        "Disney+",
-        "DraftKings",
-        "Epic Games",
-        "Fanatics",
-        "FanDuel",
-        "Kajabi",
-        "NBCUniversal",
-        "Peacock",
-        "Netflix",
-        "Paramount",
-        "Passes",
-        "Patreon",
-        "Pinterest",
-        "Reddit",
-        "Roblox",
-        "Sotheby's",
-        "Spotify",
-        "Spotter",
-        "Substack",
-        "Warner Bros. Discovery",
-        "Whatnot",
-    ],
-    # Renamed from "stablecoins" — your list spans crypto, neobanks, brokerages,
-    # corp cards, BNPL, and payments infra. Reorganize freely.
-    "fintech_crypto": [
-        "Affirm",
-        "Alpaca",
-        "Anchorage",
-        "Arrived",
-        "Betterment",
-        "Block",
-        "Square",
-        "Cash App",
-        "Blockchain.com",
-        "Cadre",
-        "Carta",
-        "Chime",
-        "Circle",
-        "Coinbase",
-        "Flex",
-        "Gemini",
-        "iCapital",
-        "Jeeves",
-        "Klarna",
-        "Kraken",
-        "Kushki",
-        "Magic Eden",
-        "Mercury",
-        "MoonPay",
-        "Novo",
-        "OpenSea",
-        "Pacaso",
-        "Plaid",
-        "Pomelo",
-        "Public.com",
-        "Ramp",
-        "Republic",
-        "Rho",
-        "Robinhood",
-        "Sardine",
-        "SoFi",
-        "Stori",
-        "Stripe",
-        "Wealthfront",
-    ],
-    "consumer_health": [
-        "Alma",
-        "Blueprint",
-        "Carrot Fertility",
-        "Eight Sleep",
-        "Function Health",
-        "Hims & Hers",
-        "InsideTracker",
-        "Levels Health",
-        "Lifeforce",
-        "Maven Clinic",
-        "Midi Health",
-        "Modern Health",
-        "Neko Health",
-        "Nudge",
-        "Oura",
-        "Papa",
-        "Ro",
-        "Roman",
-        "Superpower",
-        "Superpower Health",
-        "Viome",
-        "Whoop",
-    ],
-    # Doesn't cleanly fit the three above — mostly commerce/marketplaces
-    # and real estate. Re-bucket as you see fit.
-    "other": [
-        "eBay",
-        "Etsy",
-        "Faire",
-        "Flow",
-        "StockX",
-        "Pattern",
-    ],
-}
-
-# ── Per-company ATS boards (watchlist mode) ─────────────────────
-# For each allowlisted company we know the ATS slug for, hit their board
-# directly. Slugs were verified once via _verify_*.py against:
+# ATS endpoints used to verify slugs:
 #   - Greenhouse: https://boards-api.greenhouse.io/v1/boards/<slug>/jobs
 #   - Lever:      https://api.lever.co/v0/postings/<slug>?mode=json
 #   - Ashby:      https://api.ashbyhq.com/posting-api/job-board/<slug>
 #
-# Companies absent from this map either don't expose an aggregator API
-# (Workday/custom — needs per-company scraper) or used a slug we didn't try.
-COMPANY_BOARDS = {
-    # ── Greenhouse ──
-    "Stripe":           {"ats": "greenhouse", "slug": "stripe"},
-    "Discord":          {"ats": "greenhouse", "slug": "discord"},
-    "Reddit":           {"ats": "greenhouse", "slug": "reddit"},
-    "Pinterest":        {"ats": "greenhouse", "slug": "pinterest"},
-    "Mercury":          {"ats": "greenhouse", "slug": "mercury"},
-    "Carta":            {"ats": "greenhouse", "slug": "carta"},
-    "Robinhood":        {"ats": "greenhouse", "slug": "robinhood"},
-    "Affirm":           {"ats": "greenhouse", "slug": "affirm"},
-    "Faire":            {"ats": "greenhouse", "slug": "faire"},
-    "Roblox":           {"ats": "greenhouse", "slug": "roblox"},
-    "Modern Health":    {"ats": "greenhouse", "slug": "modernhealth"},
-    "Pacaso":           {"ats": "greenhouse", "slug": "pacaso"},
-    "SoFi":             {"ats": "greenhouse", "slug": "sofi"},
-    "Betterment":       {"ats": "greenhouse", "slug": "betterment"},
-    "Alpaca":           {"ats": "greenhouse", "slug": "alpaca"},
-    "Alma":             {"ats": "greenhouse", "slug": "alma"},
-    "Oura":             {"ats": "greenhouse", "slug": "oura"},
-    "Papa":             {"ats": "greenhouse", "slug": "papa"},
-    "Maven Clinic":     {"ats": "greenhouse", "slug": "maven"},
-    "Midi Health":      {"ats": "greenhouse", "slug": "midihealth"},
-    "Carrot Fertility": {"ats": "greenhouse", "slug": "carrotfertility"},
-    "iCapital":         {"ats": "greenhouse", "slug": "icapitalnetwork"},
-    "Public.com":       {"ats": "greenhouse", "slug": "public"},
-    "Chime":            {"ats": "greenhouse", "slug": "chime"},
-    "Flex":             {"ats": "greenhouse", "slug": "flex"},
-    "Spotter":          {"ats": "greenhouse", "slug": "spotter"},
-    "FanDuel":          {"ats": "greenhouse", "slug": "fanduel"},
-    "Fanatics":         {"ats": "greenhouse", "slug": "fanaticsinc"},
-    "Blockchain.com":   {"ats": "greenhouse", "slug": "blockchain"},
-    "Gemini":           {"ats": "greenhouse", "slug": "gemini"},
-    "A24":              {"ats": "greenhouse", "slug": "a24"},
-    "Epic Games":       {"ats": "greenhouse", "slug": "epicgames"},
-    "Sotheby's":        {"ats": "greenhouse", "slug": "sothebys"},
-    "StockX":           {"ats": "greenhouse", "slug": "stockx"},
-    # Block / Cash App / Square all share the same Greenhouse board.
-    # bu_filter narrows each entry to its Business Unit so the digest
-    # attributes jobs correctly.
-    "Block":            {"ats": "greenhouse", "slug": "block", "bu_filter": "Centralized Block"},
-    "Cash App":         {"ats": "greenhouse", "slug": "block", "bu_filter": "Cash"},
-    "Square":           {"ats": "greenhouse", "slug": "block", "bu_filter": "Square"},
-
-    # ── Workday ──
-    "Warner Bros. Discovery": {"ats": "workday", "tenant": "warnerbros", "wd": "wd5", "site": "global"},
-    "Disney":                 {"ats": "workday", "tenant": "disney",     "wd": "wd5", "site": "disneycareer"},
-    "Etsy":                   {"ats": "workday", "tenant": "etsy",       "wd": "wd5", "site": "Etsy_Careers"},
-    "DraftKings":             {"ats": "workday", "tenant": "draftkings", "wd": "wd1", "site": "DraftKings"},
-    "Christie's":             {"ats": "workday", "tenant": "christies",  "wd": "wd3", "site": "Christies_Careers"},
-
-    # ── Workable ──
-    "Blueprint":              {"ats": "workable", "slug": "blueprint-bryanjohnson"},
-
-    # ── SmartRecruiters ──
-    # NBCUniversal's board (~420 postings) already includes Peacock roles
-    # under Business Segment / Brands; no separate Peacock entry to avoid
-    # double-counting. If we ever want to split, add a second entry with
-    # brand_filter or segment_filter set to "Peacock".
-    "NBCUniversal":           {"ats": "smartrecruiters", "slug": "NBCUniversal3"},
-
-    # ── Lever ──
-    "Plaid":            {"ats": "lever", "slug": "plaid"},
-    "Whoop":            {"ats": "lever", "slug": "whoop"},
-    "MoonPay":          {"ats": "lever", "slug": "moonpay"},
-    "Anchorage":        {"ats": "lever", "slug": "anchorage"},
-    "Ro":               {"ats": "lever", "slug": "ro"},
-    "Kraken":           {"ats": "lever", "slug": "kraken"},
-    "Jeeves":           {"ats": "lever", "slug": "tryjeeves"},
-    "Wealthfront":      {"ats": "lever", "slug": "wealthfront"},
-    "Lifeforce":        {"ats": "lever", "slug": "lifeforce"},
-    "Viome":            {"ats": "lever", "slug": "viome"},
-    "Neko Health":      {"ats": "lever", "slug": "nekohealth"},
-    "Spotify":          {"ats": "lever", "slug": "spotify"},
-    "Flow":             {"ats": "lever", "slug": "flowlife"},
-    "Pattern":          {"ats": "lever", "slug": "pattern"},
-    "Netflix":          {"ats": "lever", "slug": "netflix"},
-
-    # ── Ashby ──
-    "Ramp":             {"ats": "ashby", "slug": "ramp"},
-    "Patreon":          {"ats": "ashby", "slug": "patreon"},
-    "Substack":         {"ats": "ashby", "slug": "substack"},
-    "Magic Eden":       {"ats": "ashby", "slug": "magiceden"},
-    "OpenSea":          {"ats": "ashby", "slug": "opensea"},
-    "Sardine":          {"ats": "ashby", "slug": "sardine"},
-    "Levels Health":    {"ats": "ashby", "slug": "levels"},
-    "Eight Sleep":      {"ats": "ashby", "slug": "eightsleep"},
-    "Cadre":            {"ats": "ashby", "slug": "cadre"},
-    "Rho":              {"ats": "ashby", "slug": "rho"},
-    "Novo":             {"ats": "ashby", "slug": "novo"},
-    "Whatnot":          {"ats": "ashby", "slug": "whatnot"},
-    "Passes":           {"ats": "ashby", "slug": "passes"},
-    "Agentio":          {"ats": "ashby", "slug": "agentio"},
-    "Nudge":            {"ats": "ashby", "slug": "nudge"},
-    "Superpower":       {"ats": "ashby", "slug": "superpower"},
-    # Note: this Ashby board is Hims & Hers' pharmacy/fulfillment arm only
-    # (compounding/facilities roles in OH & AZ). Their corporate strategy/
-    # ops roles live elsewhere — effectively still uncovered for our digest.
-    "Hims & Hers":      {"ats": "ashby", "slug": "hims-and-hers"},
-
-    # ── Not yet covered ──
-    # Either on an ATS we don't have an adapter for, or behind Cloudflare.
-    #   - Paramount: SuccessFactors (separate adapter, no clean public API)
-    #   - Klarna: migrating off Workday to Deel (separate adapter)
-    #   - eBay: Phenom People (separate adapter, no clean public endpoint)
-    #   - Coinbase: Cloudflare-protected, custom careers page (no Greenhouse/Lever slug)
-    #   - Kajabi: JS-rendered, ATS not yet identified
-    #   - Function Health: custom careers page (Gem-powered)
-    #   - Circle: PhenomPeople hint, would need Phenom adapter
-    #   - Arrived: Breezy HR (separate adapter)
-    #   - InsideTracker, Republic, Stori, Kushki, Pomelo (fintech): TBD
-    #   - Cash App, Square: route through Block's Greenhouse (already wired via bu_filter)
-}
-
-# Registry-backed company selection. The legacy literals above document the
-# original seed list; these generated values are what the bot actually uses.
+# Companies on gated/JS-rendered platforms (June 2026 investigation). These have
+# no clean public JSON API, so they need the headless-browser path.
+#   - Circle, eBay: Phenom People -> COVERED via scrapers/phenom.py (browser).
+#     The phenom adapter captures the page's own job API responses; it's the
+#     reusable "browser robot" — Gem/SuccessFactors below can follow the same
+#     pattern (load page, snoop the jobs XHR, normalize).
+#   - Function Health: Gem (jobs.gem.com/function-health) — JS SPA, API 403.
+#   - Paramount: SuccessFactors — OData, tenant-gated.
+#   - Klarna: Deel — no documented public board API.
+#   - Coinbase: Cloudflare-protected custom careers page.
+#   - Kajabi: JS-rendered, ATS not identified.
+#   - Republic: custom careers (republic.com/careers), ATS not exposed.
+#   - InsideTracker: email-only applications (no ATS).
+# Low-priority (LatAm, little/no US early-career presence — US-only filter would
+# drop nearly everything): Stori (Greenhouse, regional slugs), Kushki (Workable,
+# slug "kushki"), Pomelo (ATS unconfirmed). Wire on request.
+# Covered this round: Arrived — Breezy HR adapter (scrapers/breezy.py).
 from company_registry import company_allowlist, company_boards
 
 COMPANY_ALLOWLIST = company_allowlist()

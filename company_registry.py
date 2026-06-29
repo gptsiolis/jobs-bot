@@ -1,5 +1,6 @@
 """Curated company registry and sponsor metadata helpers."""
 
+import functools
 import json
 import os
 import re
@@ -47,8 +48,15 @@ def _sponsor_tier_from_score(score):
     return None
 
 
+@functools.lru_cache(maxsize=1)
 def load_registry():
-    """Load curated companies, overlaying generated sponsor scores when present."""
+    """Load curated companies, overlaying generated sponsor scores when present.
+
+    Cached for the process lifetime: this is read on a hot path
+    (metadata_for_company runs once per scraped job) and the underlying JSON
+    files don't change mid-run. Call load_registry.cache_clear() after editing
+    the files in a long-lived process.
+    """
     raw = _load_json(REGISTRY_FILE, {"companies": []})
     scores = _load_json(SPONSOR_SCORES_FILE, {})
     companies = []
@@ -64,6 +72,20 @@ def load_registry():
                 enriched["sponsor_tier"] = score_tier
         companies.append(enriched)
     return companies
+
+
+@functools.lru_cache(maxsize=1)
+def _metadata_index():
+    """{normalized_name: metadata} for O(1) metadata_for_company lookups."""
+    index = {}
+    for company in load_registry():
+        index[normalize_company_name(company.get("name"))] = {
+            "sector": company.get("sector", "other"),
+            "quality_tier": company.get("quality_tier", "acceptable"),
+            "sponsor_tier": company.get("sponsor_tier", "unknown_no_ban"),
+            "source_notes": company.get("source_notes", ""),
+        }
+    return index
 
 
 def validate_registry(companies=None):
@@ -130,15 +152,9 @@ def company_boards():
 
 def metadata_for_company(name):
     """Return registry metadata for display/sorting, or conservative defaults."""
-    target = normalize_company_name(name)
-    for company in load_registry():
-        if normalize_company_name(company.get("name")) == target:
-            return {
-                "sector": company.get("sector", "other"),
-                "quality_tier": company.get("quality_tier", "acceptable"),
-                "sponsor_tier": company.get("sponsor_tier", "unknown_no_ban"),
-                "source_notes": company.get("source_notes", ""),
-            }
+    metadata = _metadata_index().get(normalize_company_name(name))
+    if metadata is not None:
+        return dict(metadata)
     return {
         "sector": "unknown",
         "quality_tier": "acceptable",

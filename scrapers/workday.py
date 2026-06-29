@@ -90,30 +90,22 @@ def _normalize_job(job, company_name, tenant, wd, site):
 
 
 def scrape_company(company_name, cfg):
-    seen_paths = set()
-    matched = []
-    for query in ROLE_QUERIES:
-        raw = _fetch_paged(cfg["tenant"], cfg["wd"], cfg["site"], query)
-        if not raw:
-            continue
-        for job in raw:
-            path = job.get("externalPath", "")
-            if path in seen_paths:
+    def _normalized_jobs():
+        seen_paths = set()
+        for query in ROLE_QUERIES:
+            raw = _fetch_paged(cfg["tenant"], cfg["wd"], cfg["site"], query)
+            if not raw:
                 continue
-            seen_paths.add(path)
-            normalized = _normalize_job(
-                job, company_name, cfg["tenant"], cfg["wd"], cfg["site"],
-            )
-            location_blob = " ".join(normalized["locations"])
-            description = normalized.get("job_description", "")
-            if not filters.passes_watchlist(
-                normalized["job_title"], location_blob, normalized["employer_name"],
-                description,
-            ):
-                continue
-            filters.add_fit_metadata(normalized, description)
-            matched.append(normalized)
-    return matched
+            for job in raw:
+                path = job.get("externalPath", "")
+                if path in seen_paths:
+                    continue
+                seen_paths.add(path)
+                yield _normalize_job(
+                    job, company_name, cfg["tenant"], cfg["wd"], cfg["site"],
+                )
+
+    return filters.match_watchlist_jobs(_normalized_jobs())
 
 
 def scrape_all(company_boards):
