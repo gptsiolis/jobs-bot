@@ -513,3 +513,37 @@ class SupabaseJobStore:
             headers={"Prefer": "return=minimal,resolution=ignore-duplicates"},
             json=suggestion,
         )
+
+    # --- Auto-apply engine ----------------------------------------------------
+
+    def get_applicant_profile(self):
+        rows = self._request(
+            "GET",
+            "/rest/v1/applicant_profile"
+            "?select=full_name,email,phone,location,linkedin_url,github_url,"
+            "portfolio_url,years_experience,work_authorized,requires_sponsorship,"
+            "willing_to_relocate,earliest_start,salary_expectation,minimum_salary,"
+            "standard_answers,resume_path,resume_filename,resume_text"
+            "&limit=1",
+        ) or []
+        return rows[0] if rows else None
+
+    def list_drafts_by_status(self, status):
+        """Queued (or other) drafts joined with the job they target."""
+        return self._request(
+            "GET",
+            "/rest/v1/application_drafts"
+            "?select=id,job_id,status,ats,apply_url,field_values,drafted_answers,"
+            "jobs(title,company,apply_url,ats,location_text,description_excerpt,"
+            "compensation_min,compensation_max)"
+            f"&status=eq.{status}"
+            "&order=created_at.asc",
+        ) or []
+
+    def update_draft(self, draft_id, payload):
+        return self._request(
+            "PATCH",
+            f"/rest/v1/application_drafts?id=eq.{quote(str(draft_id), safe='')}",
+            headers={"Prefer": "return=minimal"},
+            json=payload,
+        )

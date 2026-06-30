@@ -91,6 +91,27 @@ export type ApplicantProfile = {
   updated_at?: string;
 };
 
+export type ApplicationDraft = {
+  id: string;
+  job_id: string;
+  status:
+    | "queued"
+    | "drafting"
+    | "needs_review"
+    | "approved"
+    | "submitting"
+    | "submitted"
+    | "failed"
+    | "skipped";
+  ats: string;
+  apply_url: string;
+  field_values: Record<string, unknown> | null;
+  drafted_answers: { question: string; answer: string }[] | null;
+  skip_reason: string | null;
+  error: string | null;
+  jobs: { title: string; company: string } | null;
+};
+
 export type StatusSuggestion = {
   id: string;
   job_id: string;

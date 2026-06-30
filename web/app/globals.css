@@ -1174,6 +1174,98 @@ tbody tr.is-selected:hover {
   font-size: 13px;
 }
 
+/* Auto-apply review surface. */
+.application-review {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.draft-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.pill.draft-ats {
+  margin-left: 8px;
+  text-transform: capitalize;
+  font-size: 11px;
+}
+
+.draft-answers {
+  display: grid;
+  gap: 10px;
+}
+
+.draft-answer {
+  display: grid;
+  gap: 4px;
+}
+
+.draft-question {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.draft-answer textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.draft-mini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.draft-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.draft-mini.is-approved {
+  color: var(--good);
+}
+
+.draft-mini.is-skipped {
+  color: var(--muted);
+}
+
 /* Applicant profile / resume intake page. */
 .main-narrow {
   max-width: 720px;

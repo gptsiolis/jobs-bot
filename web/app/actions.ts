@@ -436,6 +436,75 @@ export async function removeRolePreference(formData: FormData) {
   revalidatePath("/");
 }
 
+// --- Auto-apply (Phase 3) -------------------------------------------------
+
+// Queue a job for the auto-apply engine. Creates/refreshes a draft in the
+// 'queued' state; the local engine then drafts answers and moves it to
+// 'needs_review'. Re-queueing an existing draft resets it to 'queued'.
+export async function queueForApply(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "");
+  if (!jobId) {
+    throw new Error("Invalid job for apply queue");
+  }
+  const supabase = await createSupabaseServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) {
+    redirect("/login");
+  }
+  const { error } = await supabase
+    .from("application_drafts")
+    .upsert(
+      { job_id: jobId, status: "queued", created_by: auth.user.id, skip_reason: null, error: null },
+      { onConflict: "job_id" }
+    );
+  if (error) {
+    throw new Error(error.message);
+  }
+  revalidatePath("/");
+}
+
+// Approve a reviewed draft (with any edits to the drafted answers) so the
+// browser runner may submit it. Nothing is ever submitted before this step.
+export async function approveDraft(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    throw new Error("Invalid draft");
+  }
+  const count = parseInt(String(formData.get("answer_count") || "0"), 10) || 0;
+  const answers: { question: string; answer: string }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const question = String(formData.get(`question_${i}`) || "");
+    const answer = String(formData.get(`answer_${i}`) || "");
+    if (question) {
+      answers.push({ question, answer });
+    }
+  }
+
+  const supabase = await requireUser();
+  const { error } = await supabase
+    .from("application_drafts")
+    .update({ status: "approved", drafted_answers: answers })
+    .eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+  revalidatePath("/");
+}
+
+// Remove a draft entirely — used to un-queue or to dismiss a reviewed draft.
+export async function removeDraft(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    throw new Error("Invalid draft");
+  }
+  const supabase = await requireUser();
+  const { error } = await supabase.from("application_drafts").delete().eq("id", id);
+  if (error) {
+    throw new Error(error.message);
+  }
+  revalidatePath("/");
+}
+
 // The applicant's reusable details + screening answers, and their resume file.
 // Upserted as a single row per user; the resume (if attached) goes to the
 // private "resumes" Storage bucket under the user's id.

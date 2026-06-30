@@ -6,8 +6,10 @@ import { JobsDashboard } from "@/components/jobs-dashboard";
 import { RolePreferencesMenu } from "@/components/role-preferences-menu";
 import { ScraperMenu } from "@/components/scraper-menu";
 import { StatusSuggestions } from "@/components/status-suggestions";
+import { ApplicationReview } from "@/components/application-review";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  ApplicationDraft,
   CompanyContact,
   CompanyWatchlistRequest,
   JobRow,
@@ -31,7 +33,8 @@ export default async function HomePage() {
     { data: rolePreferences },
     { count: appliedTotal },
     { data: companyContacts },
-    { data: statusSuggestions }
+    { data: statusSuggestions },
+    { data: applicationDrafts }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -72,6 +75,12 @@ export default async function HomePage() {
         "id,job_id,suggested_status,current_status,decision,confidence,evidence,email_subject,email_from,created_at,jobs(title,company)"
       )
       .eq("resolved", false)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("application_drafts")
+      .select(
+        "id,job_id,status,ats,apply_url,field_values,drafted_answers,skip_reason,error,jobs(title,company)"
+      )
       .order("created_at", { ascending: false })
   ]);
 
@@ -111,6 +120,9 @@ export default async function HomePage() {
       <main className="main">
         <StatusSuggestions
           suggestions={(statusSuggestions || []) as unknown as StatusSuggestion[]}
+        />
+        <ApplicationReview
+          drafts={(applicationDrafts || []) as unknown as ApplicationDraft[]}
         />
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}

@@ -11,9 +11,11 @@ import {
   MessageSquareReply,
   RotateCcw,
   Search,
+  Send,
   XCircle
 } from "lucide-react";
 import {
+  queueForApply,
   reorderJobs,
   setCompanyContactResponded,
   setCompanyMessaged,
@@ -201,6 +203,17 @@ function JobActions({ job }: { job: JobRow }) {
       <StatusAction jobId={job.job_id} status="applied" title="Applied">
         <CheckCircle2 size={16} />
       </StatusAction>
+      <form action={queueForApply}>
+        <input type="hidden" name="job_id" value={job.job_id} />
+        <button
+          className="status-button"
+          type="submit"
+          title="Queue for auto-apply (drafts an application for your review)"
+          aria-label="Queue for auto-apply"
+        >
+          <Send size={16} />
+        </button>
+      </form>
       <StatusAction jobId={job.job_id} status="dismissed" title="Dismiss">
         <XCircle size={16} />
       </StatusAction>
