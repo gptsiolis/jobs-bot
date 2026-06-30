@@ -296,8 +296,11 @@ def process_inbox(dry_run=False):
             if not new_status or not job:
                 stats["skipped"] += 1
                 if store:
+                    # Only record a job_id that actually exists (a matched
+                    # candidate); the model may echo a plausible-looking id that
+                    # isn't in the jobs table, which would break the FK.
                     store.record_processed_email(message_id, email["thread_id"],
-                                                 job_id=job_id or None,
+                                                 job_id=(job["job_id"] if job else None),
                                                  decision=decision, confidence=confidence)
                 continue
 
