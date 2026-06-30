@@ -108,7 +108,11 @@ export type ApplicationDraft = {
   field_values: Record<string, unknown> | null;
   drafted_answers: { question: string; answer: string }[] | null;
   skip_reason: string | null;
+  flag_reason: string | null;
   error: string | null;
+  confirmation_path: string | null;
+  submitted_at: string | null;
+  screenshot_url?: string | null;
   jobs: { title: string; company: string } | null;
 };
 

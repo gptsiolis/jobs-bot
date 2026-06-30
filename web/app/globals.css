@@ -1266,6 +1266,14 @@ tbody tr.is-selected:hover {
   color: var(--muted);
 }
 
+.draft-mini.is-flagged {
+  color: var(--warn);
+}
+
+.draft-mini .text-button {
+  margin-left: 4px;
+}
+
 /* Applicant profile / resume intake page. */
 .main-narrow {
   max-width: 720px;

@@ -1,7 +1,7 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, FileText, Send, XCircle } from "lucide-react";
-import { approveDraft, removeDraft } from "@/app/actions";
+import { AlertTriangle, CheckCircle2, ExternalLink, Send, XCircle } from "lucide-react";
+import { approveDraft, queueForApply, removeDraft } from "@/app/actions";
 import type { ApplicationDraft } from "@/lib/types";
 
 // The auto-apply review surface. Drafts the engine has prepared
@@ -13,11 +13,16 @@ export function ApplicationReview({ drafts }: { drafts: ApplicationDraft[] }) {
     return null;
   }
 
-  const review = drafts.filter((d) => d.status === "needs_review");
-  const approved = drafts.filter((d) => d.status === "approved");
+  // A needs_review draft with a flag_reason was filled by the agent but couldn't
+  // be auto-submitted (captcha/login/missing field) — it needs a manual finish.
+  // Without a flag_reason it's a freshly drafted application awaiting approval.
+  const review = drafts.filter((d) => d.status === "needs_review" && !d.flag_reason);
+  const flagged = drafts.filter((d) => d.status === "needs_review" && d.flag_reason);
+  const approved = drafts.filter((d) => d.status === "approved" || d.status === "submitting");
   const submitted = drafts.filter((d) => d.status === "submitted");
   const queued = drafts.filter((d) => d.status === "queued" || d.status === "drafting");
-  const skipped = drafts.filter((d) => d.status === "skipped" || d.status === "failed");
+  const failed = drafts.filter((d) => d.status === "failed");
+  const skipped = drafts.filter((d) => d.status === "skipped");
 
   return (
     <section className="application-review">
@@ -80,13 +85,41 @@ export function ApplicationReview({ drafts }: { drafts: ApplicationDraft[] }) {
         );
       })}
 
+      {flagged.length ? (
+        <ul className="draft-mini-list">
+          {flagged.map((d) => (
+            <li key={d.id} className="draft-mini is-flagged">
+              <AlertTriangle size={14} />
+              <span>{d.jobs?.company || ""} — {d.jobs?.title || d.job_id}</span>
+              <span className="muted">{d.flag_reason}</span>
+              {d.apply_url ? (
+                <a className="text-button" href={d.apply_url} target="_blank" rel="noreferrer">
+                  finish manually
+                </a>
+              ) : null}
+              {d.screenshot_url ? (
+                <a className="text-button" href={d.screenshot_url} target="_blank" rel="noreferrer">
+                  screenshot
+                </a>
+              ) : null}
+              <form action={removeDraft}>
+                <input type="hidden" name="id" value={d.id} />
+                <button className="text-button" type="submit">clear</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {approved.length ? (
         <ul className="draft-mini-list">
           {approved.map((d) => (
             <li key={d.id} className="draft-mini is-approved">
               <CheckCircle2 size={14} />
               <span>{d.jobs?.company || ""} — {d.jobs?.title || d.job_id}</span>
-              <span className="muted">approved · awaiting submit</span>
+              <span className="muted">
+                {d.status === "submitting" ? "submitting…" : "approved · agent will apply"}
+              </span>
             </li>
           ))}
         </ul>
@@ -95,10 +128,31 @@ export function ApplicationReview({ drafts }: { drafts: ApplicationDraft[] }) {
       {submitted.length ? (
         <ul className="draft-mini-list">
           {submitted.map((d) => (
-            <li key={d.id} className="draft-mini">
-              <FileText size={14} />
+            <li key={d.id} className="draft-mini is-approved">
+              <CheckCircle2 size={14} />
               <span>{d.jobs?.company || ""} — {d.jobs?.title || d.job_id}</span>
               <span className="muted">submitted</span>
+              {d.screenshot_url ? (
+                <a className="text-button" href={d.screenshot_url} target="_blank" rel="noreferrer">
+                  confirmation
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {failed.length ? (
+        <ul className="draft-mini-list">
+          {failed.map((d) => (
+            <li key={d.id} className="draft-mini is-flagged">
+              <XCircle size={14} />
+              <span>{d.jobs?.company || ""} — {d.jobs?.title || d.job_id}</span>
+              <span className="muted">{d.error || "failed"}</span>
+              <form action={queueForApply}>
+                <input type="hidden" name="job_id" value={d.job_id} />
+                <button className="text-button" type="submit">retry</button>
+              </form>
             </li>
           ))}
         </ul>
@@ -110,7 +164,7 @@ export function ApplicationReview({ drafts }: { drafts: ApplicationDraft[] }) {
             <li key={d.id} className="draft-mini is-skipped">
               <XCircle size={14} />
               <span>{d.jobs?.company || ""} — {d.jobs?.title || d.job_id}</span>
-              <span className="muted">{d.skip_reason || d.error || "skipped"}</span>
+              <span className="muted">{d.skip_reason || "skipped"}</span>
               <form action={removeDraft}>
                 <input type="hidden" name="id" value={d.id} />
                 <button className="text-button" type="submit">clear</button>

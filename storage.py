@@ -566,3 +566,15 @@ class SupabaseJobStore:
             headers={"Prefer": "return=minimal"},
             json={"resume_text": text},
         )
+
+    def upload_application_screenshot(self, dest_path, content, content_type="image/png"):
+        """Upload (upsert) a confirmation/flag screenshot to the applications bucket."""
+        response = self.session.post(
+            f"{self.url}/storage/v1/object/applications/{dest_path}",
+            headers={**self.headers, "Content-Type": content_type, "x-upsert": "true"},
+            data=content,
+            timeout=60,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Screenshot upload failed: {response.text}")
+        return dest_path

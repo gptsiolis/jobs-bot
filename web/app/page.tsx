@@ -79,10 +79,30 @@ export default async function HomePage() {
     supabase
       .from("application_drafts")
       .select(
-        "id,job_id,status,ats,apply_url,field_values,drafted_answers,skip_reason,error,jobs(title,company)"
+        "id,job_id,status,ats,apply_url,field_values,drafted_answers,skip_reason,flag_reason,error,confirmation_path,submitted_at,jobs(title,company)"
       )
       .order("created_at", { ascending: false })
   ]);
+
+  // Sign the agent's confirmation/flag screenshots so the dashboard can show them.
+  const draftRows = (applicationDrafts || []) as unknown as ApplicationDraft[];
+  const shotPaths = draftRows.map((d) => d.confirmation_path).filter(Boolean) as string[];
+  let signedShots: Record<string, string> = {};
+  if (shotPaths.length) {
+    const { data: signed } = await supabase.storage
+      .from("applications")
+      .createSignedUrls(shotPaths, 3600);
+    signedShots = Object.fromEntries(
+      (signed || [])
+        .filter((s): s is { path: string; signedUrl: string; error: null } =>
+          Boolean(s.signedUrl && s.path))
+        .map((s) => [s.path, s.signedUrl])
+    );
+  }
+  const draftsWithShots = draftRows.map((d) => ({
+    ...d,
+    screenshot_url: d.confirmation_path ? signedShots[d.confirmation_path] ?? null : null
+  }));
 
   if (jobsError) {
     throw new Error(jobsError.message);
@@ -121,9 +141,7 @@ export default async function HomePage() {
         <StatusSuggestions
           suggestions={(statusSuggestions || []) as unknown as StatusSuggestion[]}
         />
-        <ApplicationReview
-          drafts={(applicationDrafts || []) as unknown as ApplicationDraft[]}
-        />
+        <ApplicationReview drafts={draftsWithShots} />
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}
           contacts={(companyContacts || []) as CompanyContact[]}
