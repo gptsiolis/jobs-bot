@@ -15,7 +15,7 @@ export default async function ProfilePage() {
   const { data: profile } = await supabase
     .from("applicant_profile")
     .select(
-      "full_name,email,phone,location,linkedin_url,portfolio_url,years_experience,work_authorized,requires_sponsorship,willing_to_relocate,earliest_start,salary_expectation,standard_answers,resume_path,resume_filename,updated_at"
+      "full_name,email,phone,location,linkedin_url,github_url,portfolio_url,years_experience,work_authorized,requires_sponsorship,willing_to_relocate,earliest_start,salary_expectation,minimum_salary,standard_answers,resume_path,resume_filename,updated_at"
     )
     .eq("created_by", auth.user.id)
     .maybeSingle();

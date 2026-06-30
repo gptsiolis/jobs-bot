@@ -455,6 +455,10 @@ export async function saveProfile(
     const v = String(formData.get(key) || "");
     return v === "" ? null : v === "yes";
   };
+  const intOrNull = (key: string) => {
+    const digits = String(formData.get(key) || "").replace(/[^0-9]/g, "");
+    return digits ? parseInt(digits, 10) : null;
+  };
 
   const profile: Record<string, unknown> = {
     created_by: userId,
@@ -463,13 +467,15 @@ export async function saveProfile(
     phone: str("phone"),
     location: str("location"),
     linkedin_url: str("linkedin_url"),
+    github_url: str("github_url"),
     portfolio_url: str("portfolio_url"),
     years_experience: str("years_experience"),
     work_authorized: tri("work_authorized"),
     requires_sponsorship: tri("requires_sponsorship"),
     willing_to_relocate: tri("willing_to_relocate"),
     earliest_start: str("earliest_start"),
-    salary_expectation: str("salary_expectation")
+    salary_expectation: str("salary_expectation"),
+    minimum_salary: intOrNull("minimum_salary")
   };
 
   const resume = formData.get("resume");

@@ -62,6 +62,14 @@ export function ProfileForm({
           />
         </label>
         <label>
+          GitHub URL
+          <input
+            name="github_url"
+            defaultValue={p?.github_url ?? ""}
+            placeholder="https://github.com/…"
+          />
+        </label>
+        <label>
           Portfolio / website
           <input
             name="portfolio_url"
@@ -114,11 +122,20 @@ export function ProfileForm({
           />
         </label>
         <label>
-          Salary expectation
+          Salary expectation <span className="profile-sub">(what to put on forms, optional)</span>
           <input
             name="salary_expectation"
             defaultValue={p?.salary_expectation ?? ""}
-            placeholder="e.g. $70,000"
+            placeholder="e.g. $80,000"
+          />
+        </label>
+        <label>
+          Minimum salary <span className="profile-sub">(won&apos;t apply to jobs below this)</span>
+          <input
+            name="minimum_salary"
+            inputMode="numeric"
+            defaultValue={p?.minimum_salary != null ? String(p.minimum_salary) : ""}
+            placeholder="e.g. 75000"
           />
         </label>
       </fieldset>

@@ -76,6 +76,7 @@ export type ApplicantProfile = {
   phone: string;
   location: string;
   linkedin_url: string;
+  github_url: string;
   portfolio_url: string;
   years_experience: string;
   work_authorized: boolean | null;
@@ -83,6 +84,7 @@ export type ApplicantProfile = {
   willing_to_relocate: boolean | null;
   earliest_start: string;
   salary_expectation: string;
+  minimum_salary: number | null;
   standard_answers: Record<string, string> | null;
   resume_path: string | null;
   resume_filename: string | null;

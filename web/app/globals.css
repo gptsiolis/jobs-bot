@@ -1230,6 +1230,12 @@ tbody tr.is-selected:hover {
   border-color: var(--accent);
 }
 
+.profile-sub {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .profile-resume-current {
   margin: 0;
   display: flex;
