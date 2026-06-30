@@ -436,6 +436,68 @@ export async function removeRolePreference(formData: FormData) {
   revalidatePath("/");
 }
 
+// The applicant's reusable details + screening answers, and their resume file.
+// Upserted as a single row per user; the resume (if attached) goes to the
+// private "resumes" Storage bucket under the user's id.
+export async function saveProfile(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const supabase = await createSupabaseServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) {
+    redirect("/login");
+  }
+  const userId = auth.user.id;
+
+  const str = (key: string) => String(formData.get(key) || "").trim();
+  const tri = (key: string) => {
+    const v = String(formData.get(key) || "");
+    return v === "" ? null : v === "yes";
+  };
+
+  const profile: Record<string, unknown> = {
+    created_by: userId,
+    full_name: str("full_name"),
+    email: str("email"),
+    phone: str("phone"),
+    location: str("location"),
+    linkedin_url: str("linkedin_url"),
+    portfolio_url: str("portfolio_url"),
+    years_experience: str("years_experience"),
+    work_authorized: tri("work_authorized"),
+    requires_sponsorship: tri("requires_sponsorship"),
+    willing_to_relocate: tri("willing_to_relocate"),
+    earliest_start: str("earliest_start"),
+    salary_expectation: str("salary_expectation")
+  };
+
+  const resume = formData.get("resume");
+  if (resume && typeof resume === "object" && "size" in resume && (resume as File).size > 0) {
+    const file = resume as File;
+    const ext = (file.name.split(".").pop() || "pdf").toLowerCase();
+    const path = `${userId}/resume.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("resumes")
+      .upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (uploadError) {
+      return { ok: false, message: "Resume upload failed: " + uploadError.message };
+    }
+    profile.resume_path = path;
+    profile.resume_filename = file.name;
+  }
+
+  const { error } = await supabase
+    .from("applicant_profile")
+    .upsert(profile, { onConflict: "created_by" });
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath("/profile");
+  return { ok: true, message: "Profile saved." };
+}
+
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();

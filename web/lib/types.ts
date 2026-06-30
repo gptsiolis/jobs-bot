@@ -70,6 +70,25 @@ export type CompanyContact = {
   created_at: string;
 };
 
+export type ApplicantProfile = {
+  full_name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin_url: string;
+  portfolio_url: string;
+  years_experience: string;
+  work_authorized: boolean | null;
+  requires_sponsorship: boolean | null;
+  willing_to_relocate: boolean | null;
+  earliest_start: string;
+  salary_expectation: string;
+  standard_answers: Record<string, string> | null;
+  resume_path: string | null;
+  resume_filename: string | null;
+  updated_at?: string;
+};
+
 export type StatusSuggestion = {
   id: string;
   job_id: string;

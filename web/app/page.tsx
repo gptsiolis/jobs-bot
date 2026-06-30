@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { CompanyWatchlistMenu } from "@/components/company-watchlist-menu";
@@ -97,6 +98,9 @@ export default async function HomePage() {
           <CompanyWatchlistMenu
             companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
           />
+          <Link className="text-button" href="/profile">
+            Profile
+          </Link>
           <form action={signOut}>
             <button className="text-button" type="submit">
               Sign out
