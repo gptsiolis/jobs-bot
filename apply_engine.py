@@ -18,6 +18,7 @@ Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY.
 Optional: ANTHROPIC_DRAFT_MODEL (default claude-sonnet-4-6).
 """
 
+import base64
 import json
 import os
 import re
@@ -102,6 +103,58 @@ def map_profile_fields(profile):
     }
 
 
+def ensure_resume_text(store, profile):
+    """Parse the uploaded resume PDF to text once, so drafts can use real
+    experience instead of generic filler. Stores the text back on the profile.
+    Best-effort: on any failure, returns "" and leaves drafting to profile data.
+    """
+    if (profile.get("resume_text") or "").strip():
+        return profile["resume_text"]
+    path = profile.get("resume_path")
+    if not path or not path.lower().endswith(".pdf"):
+        return ""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return ""
+    try:
+        raw = store.download_resume(path)
+        b64 = base64.standard_b64encode(raw).decode("ascii")
+        resp = requests.post(
+            ANTHROPIC_ENDPOINT,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": _draft_model(),
+                "max_tokens": 4000,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "document", "source": {
+                            "type": "base64", "media_type": "application/pdf", "data": b64}},
+                        {"type": "text", "text":
+                            "Extract the full plain text of this resume. Return only the text."},
+                    ],
+                }],
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        text = "".join(
+            b.get("text", "") for b in resp.json().get("content", []) if b.get("type") == "text"
+        ).strip()
+        if text:
+            store.save_resume_text(path, text)
+            profile["resume_text"] = text
+            print(f"[resume] parsed {len(text)} chars from {profile.get('resume_filename', path)}")
+        return text
+    except Exception as exc:
+        print(f"[resume] parse skipped: {exc}")
+        return ""
+
+
 def _candidate_summary(profile):
     bits = []
     if profile.get("years_experience"):
@@ -129,8 +182,11 @@ def draft_answers(job, profile):
         "You help a job seeker draft application answers. Write in the "
         "candidate's first person, concise (2-4 sentences each), specific, and "
         "honest — never invent facts, employers, degrees, or metrics not given. "
-        "If you lack a detail, stay general rather than fabricate. Return JSON "
-        'only: {"answers": [{"question": str, "answer": str}, ...]} covering '
+        "If you lack a detail, stay general rather than fabricate. NEVER write a "
+        "bracketed placeholder like [location], [company], or [X years]; if a "
+        "detail is unknown, simply omit it and phrase the sentence naturally. Do "
+        "not state a specific city or current employer unless it is given. Return "
+        'JSON only: {"answers": [{"question": str, "answer": str}, ...]} covering '
         "exactly the questions provided, in order."
     )
     user = (
@@ -175,6 +231,7 @@ def process_queue(dry_run=False):
         print("[Apply] No applicant profile found — fill it in on the dashboard first.")
         return {"queued": 0, "drafted": 0, "skipped": 0}
 
+    ensure_resume_text(store, profile)
     floor = profile.get("minimum_salary")
     drafts = store.list_drafts_by_status("queued")
     stats = {"queued": len(drafts), "drafted": 0, "skipped": 0}

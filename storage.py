@@ -547,3 +547,22 @@ class SupabaseJobStore:
             headers={"Prefer": "return=minimal"},
             json=payload,
         )
+
+    def download_resume(self, resume_path):
+        """Fetch raw resume bytes from the private Storage bucket (service role)."""
+        response = self.session.get(
+            f"{self.url}/storage/v1/object/resumes/{resume_path}",
+            headers=self.headers,
+            timeout=60,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Resume download failed: {response.text}")
+        return response.content
+
+    def save_resume_text(self, resume_path, text):
+        return self._request(
+            "PATCH",
+            f"/rest/v1/applicant_profile?resume_path=eq.{quote(str(resume_path), safe='')}",
+            headers={"Prefer": "return=minimal"},
+            json={"resume_text": text},
+        )
