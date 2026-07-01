@@ -520,7 +520,7 @@ class SupabaseJobStore:
         rows = self._request(
             "GET",
             "/rest/v1/applicant_profile"
-            "?select=full_name,email,phone,location,linkedin_url,github_url,"
+            "?select=full_name,email,phone,location,postal_code,linkedin_url,github_url,"
             "portfolio_url,years_experience,work_authorized,requires_sponsorship,"
             "willing_to_relocate,earliest_start,salary_expectation,minimum_salary,"
             "standard_answers,resume_path,resume_filename,resume_text"
