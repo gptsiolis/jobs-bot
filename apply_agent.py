@@ -82,7 +82,9 @@ _EXTRACT_JS = r"""
     const tag = el.tagName.toLowerCase();
     const type = (el.getAttribute('type') || tag).toLowerCase();
     if (['hidden', 'submit', 'button', 'reset', 'image'].includes(type)) continue;
-    if (el.offsetParent === null && type !== 'file') continue; // skip not-visible
+    // Radios/checkboxes are often custom-styled (real input visually hidden) but
+    // still functional — keep them; only skip other invisible fields.
+    if (el.offsetParent === null && !['file', 'radio', 'checkbox'].includes(type)) continue;
     el.setAttribute('data-apply-idx', String(i));
     let label = el.getAttribute('aria-label') || '';
     if (!label && el.id) {
@@ -94,7 +96,10 @@ _EXTRACT_JS = r"""
     let options = null;
     if (tag === 'select') options = Array.from(el.options).map(o => o.text.trim()).filter(Boolean);
     const required = el.required || el.getAttribute('aria-required') === 'true';
-    out.push({ idx: i, tag, type, label: (label || '').replace(/\s+/g, ' ').trim().slice(0, 160), required, options });
+    const autocomplete = el.getAttribute('role') === 'combobox' ||
+      !!el.getAttribute('aria-autocomplete') || el.getAttribute('aria-haspopup') === 'listbox';
+    out.push({ idx: i, tag, type, autocomplete,
+      label: (label || '').replace(/\s+/g, ' ').trim().slice(0, 160), required, options });
     i++;
   }
   return out;
@@ -226,7 +231,9 @@ def fill_form(page, fields, mapping, resume_path):
                     loc.select_option(str(value))
             elif field["type"] in ("checkbox", "radio"):
                 if str(value).lower() in ("true", "yes", "1", "on"):
-                    loc.check()
+                    _check_maybe_hidden(page, loc, idx)
+            elif field.get("autocomplete"):
+                _fill_autocomplete(page, loc, str(value))
             else:
                 loc.fill(str(value))
         except Exception:
@@ -241,6 +248,122 @@ def fill_form(page, fields, mapping, resume_path):
         except Exception:
             attached = False
     return attached
+
+
+# After filling, re-read the form and return the labels of any REQUIRED field
+# that is still empty — catches custom widgets (autocomplete, styled radios) that
+# our fill couldn't populate, so we flag instead of submitting an incomplete form.
+_VERIFY_JS = r"""
+() => {
+  const empties = [];
+  const seenRadio = {};
+  for (const el of document.querySelectorAll('[data-apply-idx]')) {
+    const required = el.required || el.getAttribute('aria-required') === 'true';
+    if (!required) continue;
+    const tag = el.tagName.toLowerCase();
+    const type = (el.getAttribute('type') || tag).toLowerCase();
+    let label = el.getAttribute('aria-label') ||
+      (el.labels && el.labels[0] && el.labels[0].innerText) || el.name || '';
+    label = (label || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (type === 'radio') {
+      const name = el.name; if (!name) continue;
+      if (seenRadio[name]) continue; seenRadio[name] = true;
+      if (!document.querySelector('input[type=radio][name="' + CSS.escape(name) + '"]:checked'))
+        empties.push(label || 'a required choice');
+    } else if (type === 'checkbox') {
+      if (!el.checked) empties.push(label || 'a required checkbox');
+    } else if (type === 'file') {
+      if (!el.files || el.files.length === 0) empties.push(label || 'a required file');
+    } else if (!el.value || !el.value.trim()) {
+      empties.push(label || 'a required field');
+    }
+  }
+  return empties;
+}
+"""
+
+
+def verify_required(page):
+    try:
+        return page.evaluate(_VERIFY_JS) or []
+    except Exception:
+        return []
+
+
+def unstuck_fills(page, fields, mapping):
+    """Return labels of text/select/autocomplete values we tried to fill but that
+    didn't actually land (the field is still empty) — the custom-widget blind
+    spot that a required-attribute check misses."""
+    by_idx = {f["idx"]: f for f in fields}
+    check = [fl["idx"] for fl in mapping.get("fills", [])
+             if by_idx.get(fl.get("idx")) and by_idx[fl["idx"]]["type"] not in ("checkbox", "radio", "file")]
+    if not check:
+        return []
+    try:
+        vals = page.evaluate(
+            """(idxs) => { const r = {};
+                for (const idx of idxs) { const el = document.querySelector('[data-apply-idx="'+idx+'"]');
+                  if (el) r[idx] = (el.value || '').trim(); } return r; }""",
+            check,
+        ) or {}
+    except Exception:
+        return []
+    out = []
+    for idx in check:
+        if not vals.get(str(idx)) and not vals.get(idx):
+            out.append(by_idx[idx].get("label") or f"field {idx}")
+    return out
+
+
+def _fill_autocomplete(page, loc, value):
+    """Type into an autocomplete/combobox field and pick the first suggestion —
+    typing alone doesn't register a value in Google-Places-style widgets."""
+    loc.click()
+    try:
+        loc.fill("")
+    except Exception:
+        pass
+    loc.type(value, delay=60)
+    page.wait_for_timeout(1500)
+    for sel in ('[role=option]', 'li[role=option]', 'ul[role=listbox] li',
+                '.pac-item', '[class*="option"]'):
+        try:
+            opt = page.query_selector(sel)
+            if opt and opt.is_visible():
+                opt.click()
+                page.wait_for_timeout(300)
+                return
+        except Exception:
+            continue
+    # Fallback: keyboard-select the first suggestion.
+    try:
+        loc.press("ArrowDown")
+        loc.press("Enter")
+    except Exception:
+        pass
+
+
+def _check_maybe_hidden(page, loc, idx):
+    """Check a radio/checkbox; if the real input is visually hidden (custom UI),
+    click its label instead."""
+    try:
+        loc.check(timeout=2000)
+        return
+    except Exception:
+        pass
+    try:
+        page.evaluate(
+            """(idx) => {
+                const el = document.querySelector('[data-apply-idx="' + idx + '"]');
+                if (!el) return;
+                let lbl = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
+                if (!lbl) lbl = el.closest('label');
+                (lbl || el).click();
+            }""",
+            str(idx),
+        )
+    except Exception:
+        pass
 
 
 def find_submit(page):
@@ -292,11 +415,16 @@ def process_draft(page, store, draft, profile, resume_path, dry_run=False):
     live_draft = {**draft, "field_values": apply_engine.map_profile_fields(profile)}
     mapping = map_fields(fields, live_draft, job)
     attached = fill_form(page, fields, mapping, resume_path)
-    missing = mapping.get("missing_required") or []
     needs_resume = any(f["type"] == "file" and f.get("required") for f in fields)
 
+    # Trust nothing: (a) required fields must hold a value, and (b) every value
+    # we *attempted* to fill must actually have landed (custom autocomplete
+    # widgets silently drop typed text). Either failing → flag, don't submit.
+    empties = verify_required(page)
+    unstuck = unstuck_fills(page, fields, mapping)
+    missing = list(dict.fromkeys((mapping.get("missing_required") or []) + empties + unstuck))
     if missing:
-        return flag("missing required: " + ", ".join(missing[:5]))
+        return flag("could not fill: " + ", ".join(missing[:6]))
     if needs_resume and not attached:
         return flag("resume upload failed")
     if not is_clean_ats(draft):
@@ -368,8 +496,11 @@ def run(dry_run=False):
     resume_path = None
     if profile.get("resume_path"):
         raw = store.download_resume(profile["resume_path"])
-        fd, resume_path = tempfile.mkstemp(suffix=".pdf")
-        with os.fdopen(fd, "wb") as fh:
+        # Keep the real filename so recruiters see e.g. George_Tsiolis_Resume.pdf,
+        # not a temp name — set_input_files uploads under the file's basename.
+        fname = profile.get("resume_filename") or "resume.pdf"
+        resume_path = os.path.join(tempfile.mkdtemp(), fname)
+        with open(resume_path, "wb") as fh:
             fh.write(raw)
 
     with sync_playwright() as p:

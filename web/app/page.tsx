@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "./actions";
 import { CompanyWatchlistMenu } from "@/components/company-watchlist-menu";
@@ -6,10 +5,8 @@ import { JobsDashboard } from "@/components/jobs-dashboard";
 import { RolePreferencesMenu } from "@/components/role-preferences-menu";
 import { ScraperMenu } from "@/components/scraper-menu";
 import { StatusSuggestions } from "@/components/status-suggestions";
-import { ApplicationReview } from "@/components/application-review";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
-  ApplicationDraft,
   CompanyContact,
   CompanyWatchlistRequest,
   JobRow,
@@ -33,8 +30,7 @@ export default async function HomePage() {
     { data: rolePreferences },
     { count: appliedTotal },
     { data: companyContacts },
-    { data: statusSuggestions },
-    { data: applicationDrafts }
+    { data: statusSuggestions }
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -75,34 +71,8 @@ export default async function HomePage() {
         "id,job_id,suggested_status,current_status,decision,confidence,evidence,email_subject,email_from,created_at,jobs(title,company)"
       )
       .eq("resolved", false)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("application_drafts")
-      .select(
-        "id,job_id,status,ats,apply_url,field_values,drafted_answers,skip_reason,flag_reason,error,confirmation_path,submitted_at,jobs(title,company)"
-      )
       .order("created_at", { ascending: false })
   ]);
-
-  // Sign the agent's confirmation/flag screenshots so the dashboard can show them.
-  const draftRows = (applicationDrafts || []) as unknown as ApplicationDraft[];
-  const shotPaths = draftRows.map((d) => d.confirmation_path).filter(Boolean) as string[];
-  let signedShots: Record<string, string> = {};
-  if (shotPaths.length) {
-    const { data: signed } = await supabase.storage
-      .from("applications")
-      .createSignedUrls(shotPaths, 3600);
-    signedShots = Object.fromEntries(
-      (signed || [])
-        .filter((s): s is { path: string; signedUrl: string; error: null } =>
-          Boolean(s.signedUrl && s.path))
-        .map((s) => [s.path, s.signedUrl])
-    );
-  }
-  const draftsWithShots = draftRows.map((d) => ({
-    ...d,
-    screenshot_url: d.confirmation_path ? signedShots[d.confirmation_path] ?? null : null
-  }));
 
   if (jobsError) {
     throw new Error(jobsError.message);
@@ -127,9 +97,6 @@ export default async function HomePage() {
           <CompanyWatchlistMenu
             companyRequests={(companyRequests || []) as CompanyWatchlistRequest[]}
           />
-          <Link className="text-button" href="/profile">
-            Profile
-          </Link>
           <form action={signOut}>
             <button className="text-button" type="submit">
               Sign out
@@ -141,7 +108,6 @@ export default async function HomePage() {
         <StatusSuggestions
           suggestions={(statusSuggestions || []) as unknown as StatusSuggestion[]}
         />
-        <ApplicationReview drafts={draftsWithShots} />
         <JobsDashboard
           jobs={(jobs || []) as JobRow[]}
           contacts={(companyContacts || []) as CompanyContact[]}
