@@ -286,7 +286,11 @@ def process_draft(page, store, draft, profile, resume_path, dry_run=False):
     if len(fields) < 2:
         return flag("no application form found on page")
 
-    mapping = map_fields(fields, draft, job)
+    # Use the LATEST profile for the structured fields (so profile edits like
+    # name/location/postal apply without re-drafting); keep the approved essay
+    # answers from the draft.
+    live_draft = {**draft, "field_values": apply_engine.map_profile_fields(profile)}
+    mapping = map_fields(fields, live_draft, job)
     attached = fill_form(page, fields, mapping, resume_path)
     missing = mapping.get("missing_required") or []
     needs_resume = any(f["type"] == "file" and f.get("required") for f in fields)

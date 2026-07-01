@@ -54,6 +54,10 @@ export function ProfileForm({
           <input name="location" defaultValue={p?.location ?? ""} placeholder="New York, NY" />
         </label>
         <label>
+          Postal / ZIP code
+          <input name="postal_code" defaultValue={p?.postal_code ?? ""} placeholder="10001" />
+        </label>
+        <label>
           LinkedIn URL
           <input
             name="linkedin_url"

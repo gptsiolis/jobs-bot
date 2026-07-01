@@ -75,6 +75,7 @@ export type ApplicantProfile = {
   email: string;
   phone: string;
   location: string;
+  postal_code: string;
   linkedin_url: string;
   github_url: string;
   portfolio_url: string;

@@ -535,6 +535,7 @@ export async function saveProfile(
     email: str("email"),
     phone: str("phone"),
     location: str("location"),
+    postal_code: str("postal_code"),
     linkedin_url: str("linkedin_url"),
     github_url: str("github_url"),
     portfolio_url: str("portfolio_url"),

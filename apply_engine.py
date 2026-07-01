@@ -90,6 +90,7 @@ def map_profile_fields(profile):
         "email": profile.get("email", ""),
         "phone": profile.get("phone", ""),
         "location": profile.get("location", ""),
+        "postal_code": profile.get("postal_code", ""),
         "open_to_relocation": bool(profile.get("willing_to_relocate")),
         "linkedin_url": profile.get("linkedin_url", ""),
         "github_url": profile.get("github_url", ""),
