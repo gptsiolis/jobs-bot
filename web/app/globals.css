@@ -338,6 +338,14 @@ tbody tr.is-selected:hover {
   font-weight: 700;
 }
 
+/* Marks a score that came from personalized AI enrichment vs the keyword score. */
+.score-ai {
+  color: var(--accent);
+  font-size: 10px;
+  vertical-align: super;
+  margin-left: 1px;
+}
+
 .fit-pill {
   text-transform: capitalize;
 }

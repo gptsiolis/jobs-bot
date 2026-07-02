@@ -15,12 +15,14 @@ on:
           - source_expansion
           - all
           - email_sync
+          - enrich
   schedule:
     - cron: "0 19 * * *"
     - cron: "40 19 * * *"
     - cron: "20 20 * * *"
     - cron: "0 21 * * 0"
     - cron: "30 13 * * *"
+    - cron: "0 22 * * *"
 
 jobs:
   scrape:
@@ -74,6 +76,8 @@ jobs:
             echo "mode=discovery" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.schedule }}" = "30 13 * * *" ]; then
             echo "mode=email_sync" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
+            echo "mode=enrich" >> "$GITHUB_OUTPUT"
           else
             echo "mode=watchlist" >> "$GITHUB_OUTPUT"
           fi
@@ -82,6 +86,11 @@ jobs:
         if: steps.mode.outputs.mode == 'email_sync'
         run: python email_sync.py
 
+      # Deepen the promising shortlist: fetch real descriptions + AI summary/score.
+      - name: Run enrichment
+        if: steps.mode.outputs.mode == 'enrich'
+        run: python enrich.py
+
       - name: Run scraper sync
-        if: steps.mode.outputs.mode != 'email_sync'
+        if: steps.mode.outputs.mode != 'email_sync' && steps.mode.outputs.mode != 'enrich'
         run: python jobs.py sync "${{ steps.mode.outputs.mode }}"

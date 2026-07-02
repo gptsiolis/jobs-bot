@@ -578,3 +578,42 @@ class SupabaseJobStore:
         if response.status_code >= 400:
             raise RuntimeError(f"Screenshot upload failed: {response.text}")
         return dest_path
+
+    # --- Enrichment (enrich.py) ----------------------------------------------
+    # The scrapers source a lot of jobs but shallowly: Getro/Consider carry no
+    # description, and only the scrape-time AI ranker (capped) ever wrote AI
+    # fields. enrich.py deepens the promising shortlist — fetch the real
+    # description, then write an AI summary + personalized fit score. These two
+    # helpers are how it reads the shortlist and writes results back.
+
+    def list_jobs_needing_enrichment(self, limit=300, min_score=55):
+        """Highest-scoring visible jobs that haven't been AI-enriched yet.
+
+        "Not enriched yet" == empty ai_summary. We enrich only visible
+        (non-hidden) jobs above the auto-hide score, best-first, so model spend
+        goes to the jobs the user will actually see. Raise min_score to spend
+        less; lower it for broader coverage.
+        """
+        return self._request(
+            "GET",
+            "/rest/v1/jobs"
+            "?select=job_id,title,company,location_text,apply_url,ats,source,"
+            "fit_bucket,role_family,applicability_score,description_excerpt"
+            f"&visibility=eq.default&applicability_score=gte.{int(min_score)}"
+            "&ai_summary=eq."
+            "&order=applicability_score.desc,last_seen_at.desc"
+            f"&limit={int(limit)}",
+        ) or []
+
+    def update_job_enrichment(self, job_id, fields):
+        """Write fetched description and/or AI fields onto an existing job row.
+
+        Direct PATCH (not the upsert) so enrichment is independent of the scrape
+        path. Migration 017 stops the next scrape from clobbering these fields.
+        """
+        return self._request(
+            "PATCH",
+            f"/rest/v1/jobs?job_id=eq.{quote(str(job_id), safe='')}",
+            headers={"Prefer": "return=minimal"},
+            json=fields,
+        )

@@ -210,16 +210,28 @@ function JobActions({ job }: { job: JobRow }) {
 
 const reorderableStatuses = new Set(["saved", "applied", "applied_messaged"]);
 
+// The score we rank/display by: the personalized AI fit score (from enrich.py)
+// when a job has been enriched, otherwise the deterministic keyword score. The
+// AI score is far more discriminating (it downranks senior/off-target roles the
+// keyword score inflates), so prefer it wherever present.
+function effectiveScore(job: JobRow) {
+  return job.ai_fit_score ?? job.applicability_score;
+}
+
+function byEffectiveScore(a: JobRow, b: JobRow) {
+  if (effectiveScore(a) !== effectiveScore(b)) {
+    return effectiveScore(b) - effectiveScore(a);
+  }
+  return (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
+}
+
 function byManualRank(a: JobRow, b: JobRow) {
   const ar = a.manual_rank;
   const br = b.manual_rank;
   if (ar !== null && br !== null && ar !== br) return ar - br;
   if (ar !== null && br === null) return -1;
   if (ar === null && br !== null) return 1;
-  if (a.applicability_score !== b.applicability_score) {
-    return b.applicability_score - a.applicability_score;
-  }
-  return (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
+  return byEffectiveScore(a, b);
 }
 
 function ReorderableJobList({
@@ -440,12 +452,17 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
   const hiddenCount = jobs.filter((job) => job.visibility === "hidden" && job.status === "new").length;
 
   const grouped = useMemo(() => {
-    return filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
+    const groups = filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
       const key = roleFamilyOf(job);
       acc[key] = acc[key] || [];
       acc[key].push(job);
       return acc;
     }, {});
+    // Rank within each role group by effective (AI-first) score.
+    for (const key of Object.keys(groups)) {
+      groups[key].sort(byEffectiveScore);
+    }
+    return groups;
   }, [filtered]);
 
   const reorderable = reorderableStatuses.has(status);
@@ -585,7 +602,17 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
                           className={job.job_id === selected?.job_id ? "is-selected" : ""}
                           onClick={() => setSelectedId(job.job_id)}
                         >
-                          <td className="score">{job.applicability_score}</td>
+                          <td
+                            className="score"
+                            title={
+                              job.ai_fit_score !== null
+                                ? `AI fit ${job.ai_fit_score} (keyword ${job.applicability_score})`
+                                : `keyword score ${job.applicability_score} — not yet AI-enriched`
+                            }
+                          >
+                            {effectiveScore(job)}
+                            {job.ai_fit_score !== null ? <span className="score-ai">★</span> : null}
+                          </td>
                           <td>
                             <span className={`pill fit-pill fit-${job.fit_bucket}`}>
                               {job.fit_bucket}
