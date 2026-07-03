@@ -144,6 +144,13 @@ def _from_html(url):
     return clean_text(html)
 
 
+def _sanitize(text):
+    """Strip NUL and other C0 control chars (keep tab/newline). Postgres text
+    columns reject \\u0000, and scraped HTML occasionally carries control bytes —
+    an un-sanitized description crashed the whole run (Supabase error 22P05)."""
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text or "")
+
+
 def fetch_description(apply_url):
     """Best-effort real description for a job, following its apply_url."""
     if not apply_url:
@@ -158,7 +165,7 @@ def fetch_description(apply_url):
             text = _from_ashby(apply_url)
         else:
             text = _from_html(apply_url)
-        return (text or "")[:DESC_CHARS]
+        return _sanitize(text)[:DESC_CHARS]
     except Exception as exc:
         print(f"  [desc] fetch failed for {apply_url[:60]}: {exc}")
         return ""
@@ -284,7 +291,7 @@ def process(dry_run=False, limit=None):
                 continue
 
             fields.update({
-                "ai_summary": str(result.get("summary") or "")[:500],
+                "ai_summary": _sanitize(str(result.get("summary") or ""))[:500],
                 "ai_fit_score": _int0100(result.get("fit_score")),
                 "ai_company_score": _int0100(result.get("company_score")),
                 "seniority_level": str(result.get("seniority_level") or "")[:40],
@@ -292,11 +299,18 @@ def process(dry_run=False, limit=None):
                 "ai_labels": [str(l)[:60] for l in (result.get("labels") or [])][:10],
                 "ranking_version": "enriched-v1",
             })
+            # Write per-job inside its own guard: a single failed PATCH (bad
+            # data, transient Supabase error) should skip that job, not abort the
+            # whole nightly run.
+            if not dry_run:
+                try:
+                    store.update_job_enrichment(job["job_id"], fields)
+                except Exception as exc:
+                    stats["errors"] += 1
+                    print(f"  [write] {label}: {exc}")
+                    continue
             stats["enriched"] += 1
             print(f"  [{fields['ai_fit_score']}] {label} :: {fields['ai_summary'][:70]}")
-
-            if not dry_run:
-                store.update_job_enrichment(job["job_id"], fields)
 
         if store:
             store.finish_run(run_id, "success", total_found=stats["shortlist"],

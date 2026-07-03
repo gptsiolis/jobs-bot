@@ -13,6 +13,14 @@ def test_extract_json_with_fences_and_trailing_prose():
     assert enrich._extract_json(trailing)["summary"] == "y"
 
 
+def test_sanitize_strips_control_chars_but_keeps_text():
+    # NUL and other C0 controls crash the Supabase text write (error 22P05).
+    assert enrich._sanitize("Ops\x00 role\x07 here") == "Ops role here"
+    # Tabs and newlines are preserved.
+    assert enrich._sanitize("line1\nline2\tend") == "line1\nline2\tend"
+    assert enrich._sanitize(None) == ""
+
+
 def test_int0100_clamps_and_handles_junk():
     assert enrich._int0100(150) == 100
     assert enrich._int0100(-5) == 0
