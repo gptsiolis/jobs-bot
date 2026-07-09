@@ -80,6 +80,33 @@ class StorageTests(unittest.TestCase):
             calculate_applicability_score(bd),
         )
 
+    def test_location_tiers_rank_metros_in_order(self):
+        # Identical jobs that differ only by location should score strictly in
+        # the user's preferred order: Miami/NYC > SF/LA > Chicago/Boston/Austin/DC
+        # > anywhere else in the US.
+        def job_in(location):
+            return {
+                "job_title": "Operations Associate",
+                "locations": [location],
+                "fit_bucket": "strong",
+                "fit_reasons": ["entry-level ops title"],
+                "sponsor_tier": "unknown_no_ban",
+                "quality_tier": "acceptable",
+            }
+
+        top = calculate_applicability_score(job_in("Miami, FL"))
+        nyc = calculate_applicability_score(job_in("New York, NY"))
+        a_tier = calculate_applicability_score(job_in("San Francisco, CA"))
+        b_tier = calculate_applicability_score(job_in("Chicago, IL"))
+        dc = calculate_applicability_score(job_in("Washington, DC"))
+        other = calculate_applicability_score(job_in("Denver, CO"))
+
+        self.assertEqual(top, nyc)
+        self.assertEqual(b_tier, dc)
+        self.assertGreater(top, a_tier)
+        self.assertGreater(a_tier, b_tier)
+        self.assertGreater(b_tier, other)
+
     def test_low_fit_priority_role_is_hidden(self):
         # Priority roles still get the ranking boost, but a low-scoring one is
         # tucked behind the toggle rather than always shown.

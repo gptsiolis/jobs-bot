@@ -55,6 +55,32 @@ QUALITY_SCORE = {
     "acceptable": 3,
 }
 
+# Location tier bonuses. The user strongly prefers a handful of metros; every
+# other US location still earns a small floor bonus. Non-US jobs are filtered
+# out well before scoring, so an unmatched-but-present location here is
+# effectively "elsewhere in the US" (or US-remote), which is why the fallback
+# is a positive floor rather than zero.
+LOCATION_TIER_POINTS = {
+    "top": 15,      # Miami, New York City — max points
+    "a": 10,        # San Francisco, Los Angeles
+    "b": 6,         # Chicago, Boston, Austin, Washington DC
+    "other_us": 2,  # anywhere else in the US (incl. US-remote)
+}
+# Checked top tier first; the first tier with a matching city substring wins, so
+# a posting tagged with several cities takes its highest-ranked metro. Matched by
+# substring against the lowercased location string.
+LOCATION_TIER_CITIES = (
+    ("top", ("miami", "new york", "nyc", "manhattan", "brooklyn")),
+    ("a", ("san francisco", "los angeles", "bay area")),
+    ("b", (
+        "chicago", "boston", "austin",
+        # DC shows up in several spellings; "washington" alone is avoided so it
+        # doesn't collide with Washington state (Seattle).
+        "washington, dc", "washington dc", "washington d.c", "d.c.",
+        "district of columbia",
+    )),
+)
+
 UPSERT_CHUNK_SIZE = 40
 UPSERT_RETRIES = 3
 
@@ -121,6 +147,23 @@ def ats_from_source(source):
     return source.lower() or "unknown"
 
 
+def _location_tier_bonus(location):
+    """Points for how strongly the user prefers a job's metro.
+
+    `location` is the already-lowercased location string. Named metros earn the
+    tiered bonuses in LOCATION_TIER_POINTS (Miami/NYC highest); any other
+    non-empty location that reached scoring is treated as elsewhere-in-the-US /
+    remote and gets the small floor bonus. An empty/unknown location earns
+    nothing, since we can't confirm it's even in the US.
+    """
+    if not location.strip():
+        return 0
+    for tier, cities in LOCATION_TIER_CITIES:
+        if any(city in location for city in cities):
+            return LOCATION_TIER_POINTS[tier]
+    return LOCATION_TIER_POINTS["other_us"]
+
+
 def calculate_applicability_score(job):
     """Score jobs on a 0-100 scale using the current fit/company metadata."""
     score = 0
@@ -146,8 +189,10 @@ def calculate_applicability_score(job):
         score += 8
     if "remote" in location:
         score += 4
-    if any(city in location for city in ("new york", "los angeles", "san francisco", "miami")):
-        score += 4
+    # Tiered metro preference: Miami/NYC max, SF/LA next, Chicago/Boston/Austin/DC
+    # below that, and a small floor for anywhere else in the US. Stacks on top of
+    # the remote bonus above (a US-remote role still counts as a location).
+    score += _location_tier_bonus(location)
     if fit_bucket == "unknown":
         score -= 8
     if "2+ years" in reasons:
