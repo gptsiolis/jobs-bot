@@ -257,6 +257,28 @@ def _apply_board_metadata(jobs, company_boards):
     return jobs
 
 
+def _coerce_ats_config(ats_config, company_name):
+    """Return a resolved request's ats_config as a dict, or None if unusable.
+
+    Resolved watchlist requests normally store ats_config as a JSON object, but a
+    row can come back as a JSON-encoded *string* (double-encoded on write). Passing
+    that string to dict() raises ValueError and would crash the entire watchlist
+    run, so parse defensively and skip any row we can't turn into a mapping rather
+    than taking down every other company with it.
+    """
+    if isinstance(ats_config, dict):
+        return dict(ats_config)
+    if isinstance(ats_config, str):
+        try:
+            parsed = json.loads(ats_config)
+        except (ValueError, TypeError):
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+    print(f"[Watchlist] Skipping {company_name!r}: unusable ats_config {ats_config!r}")
+    return None
+
+
 def _load_dynamic_company_boards(store=None):
     try:
         store = store or SupabaseJobStore()
@@ -270,7 +292,9 @@ def _load_dynamic_company_boards(store=None):
         status = request.get("status")
         ats_config = request.get("ats_config")
         if status == "resolved" and ats_config:
-            config = dict(ats_config)
+            config = _coerce_ats_config(ats_config, company_name)
+            if config is None:
+                continue
         elif status in {"pending", "unresolved"}:
             config, error = board_resolver.resolve_company_board(company_name)
             if not config:
