@@ -19,7 +19,7 @@ on:
   schedule:
     - cron: "0 19 * * *"
     - cron: "40 19 * * *"
-    - cron: "20 20 * * *"
+    - cron: "20 20 * * 3"
     - cron: "0 21 * * 0"
     - cron: "30 13 * * *"
     - cron: "0 22 * * *"
@@ -70,7 +70,7 @@ jobs:
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.schedule }}" = "0 21 * * 0" ]; then
             echo "mode=source_expansion" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "20 20 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "20 20 * * 3" ]; then
             echo "mode=job_search" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.schedule }}" = "40 19 * * *" ]; then
             echo "mode=discovery" >> "$GITHUB_OUTPUT"
