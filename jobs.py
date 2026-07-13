@@ -314,6 +314,13 @@ def _load_dynamic_company_boards(store=None):
         else:
             continue
 
+        # Defense in depth: a resolver regression (or corrupt stored config) must
+        # never reach setdefault and take down the whole watchlist run. Skip any
+        # row whose config didn't end up a usable mapping.
+        if not isinstance(config, dict):
+            print(f"[Watchlist] Skipping {company_name!r}: non-dict config {config!r}")
+            continue
+
         config.setdefault("sector", request.get("sector") or "user_added")
         config.setdefault("quality_tier", request.get("quality_tier") or "acceptable")
         config.setdefault("sponsor_tier", request.get("sponsor_tier") or "unknown_no_ban")

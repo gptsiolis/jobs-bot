@@ -58,14 +58,14 @@ def _probe_greenhouse(session, slug):
         f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true",
     )
     if isinstance(data, dict) and isinstance(data.get("jobs"), list):
-        return {"ats": "greenhouse", "slug": slug}
+        return {"ats": "greenhouse", "slug": slug}, None
     return None, error
 
 
 def _probe_lever(session, slug):
     data, error = _get_json(session, f"https://api.lever.co/v0/postings/{slug}?mode=json")
     if isinstance(data, list):
-        return {"ats": "lever", "slug": slug}
+        return {"ats": "lever", "slug": slug}, None
     return None, error
 
 
@@ -75,7 +75,7 @@ def _probe_ashby(session, slug):
         f"https://api.ashbyhq.com/posting-api/job-board/{slug}",
     )
     if isinstance(data, dict) and isinstance(data.get("jobs") or data.get("jobPostings"), list):
-        return {"ats": "ashby", "slug": slug}
+        return {"ats": "ashby", "slug": slug}, None
     return None, error
 
 
@@ -85,7 +85,7 @@ def _probe_workable(session, slug):
         f"https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true",
     )
     if isinstance(data, dict) and isinstance(data.get("jobs"), list):
-        return {"ats": "workable", "slug": slug}
+        return {"ats": "workable", "slug": slug}, None
     return None, error
 
 
@@ -95,7 +95,7 @@ def _probe_smartrecruiters(session, slug):
         f"https://api.smartrecruiters.com/v1/companies/{slug}/postings?limit=1&offset=0",
     )
     if isinstance(data, dict) and "content" in data:
-        return {"ats": "smartrecruiters", "slug": slug}
+        return {"ats": "smartrecruiters", "slug": slug}, None
     return None, error
 
 
@@ -105,7 +105,7 @@ def _probe_dayforce(session, slug):
         f"https://www.dayforcehcm.com/api/{slug}/V1/JobFeeds?includeActivePostingOnly=true",
     )
     if isinstance(data, list):
-        return {"ats": "dayforce", "company": slug}
+        return {"ats": "dayforce", "company": slug}, None
     return None, error
 
 
