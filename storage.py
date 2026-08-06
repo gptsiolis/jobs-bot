@@ -56,15 +56,14 @@ QUALITY_SCORE = {
 }
 
 # Location tier bonuses. The user strongly prefers a handful of metros; every
-# other US location still earns a small floor bonus. Non-US jobs are filtered
-# out well before scoring, so an unmatched-but-present location here is
-# effectively "elsewhere in the US" (or US-remote), which is why the fallback
-# is a positive floor rather than zero.
+# other allowed location still earns a small floor bonus. Most non-US jobs are
+# filtered out before scoring, with explicit target metros such as Toronto
+# allowed through by the shared location filter.
 LOCATION_TIER_POINTS = {
     "top": 15,      # Miami, New York City — max points
     "a": 10,        # San Francisco, Los Angeles
-    "b": 6,         # Chicago, Boston, Austin, Washington DC
-    "other_us": 2,  # anywhere else in the US (incl. US-remote)
+    "b": 6,         # Chicago, Boston, Austin, Washington DC, Toronto
+    "other_us": 2,  # anywhere else allowed by filters (incl. US-remote)
 }
 # Checked top tier first; the first tier with a matching city substring wins, so
 # a posting tagged with several cities takes its highest-ranked metro. Matched by
@@ -77,7 +76,7 @@ LOCATION_TIER_CITIES = (
         # DC shows up in several spellings; "washington" alone is avoided so it
         # doesn't collide with Washington state (Seattle).
         "washington, dc", "washington dc", "washington d.c", "d.c.",
-        "district of columbia",
+        "district of columbia", "toronto",
     )),
 )
 

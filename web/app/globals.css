@@ -241,6 +241,25 @@ th {
   background: #fbfbf8;
 }
 
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.th-sort:hover,
+.th-sort.is-active {
+  color: var(--accent-strong);
+}
+
 tr:last-child td {
   border-bottom: 0;
 }

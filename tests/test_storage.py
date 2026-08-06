@@ -99,10 +99,12 @@ class StorageTests(unittest.TestCase):
         a_tier = calculate_applicability_score(job_in("San Francisco, CA"))
         b_tier = calculate_applicability_score(job_in("Chicago, IL"))
         dc = calculate_applicability_score(job_in("Washington, DC"))
+        toronto = calculate_applicability_score(job_in("Toronto, ON"))
         other = calculate_applicability_score(job_in("Denver, CO"))
 
         self.assertEqual(top, nyc)
         self.assertEqual(b_tier, dc)
+        self.assertEqual(b_tier, toronto)
         self.assertGreater(top, a_tier)
         self.assertGreater(a_tier, b_tier)
         self.assertGreater(b_tier, other)

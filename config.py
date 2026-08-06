@@ -269,6 +269,9 @@ LOCATION_ALLOW = {
     "Chicago": [
         "chicago",
     ],
+    "Toronto": [
+        "toronto", "toronto, on", "toronto, ontario", "greater toronto",
+    ],
 }
 
 # If True, remote roles pass the location filter regardless of metro.

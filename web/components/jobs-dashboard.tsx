@@ -3,6 +3,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Bookmark,
   CheckCircle2,
   ExternalLink,
@@ -209,6 +211,7 @@ function JobActions({ job }: { job: JobRow }) {
 }
 
 const reorderableStatuses = new Set(["saved", "applied", "applied_messaged"]);
+type SeenSortDirection = "desc" | "asc";
 
 // The score we rank/display by: the personalized AI fit score (from enrich.py)
 // when a job has been enriched, otherwise the deterministic keyword score. The
@@ -232,6 +235,14 @@ function byManualRank(a: JobRow, b: JobRow) {
   if (ar !== null && br === null) return -1;
   if (ar === null && br !== null) return 1;
   return byEffectiveScore(a, b);
+}
+
+function bySeenDate(direction: SeenSortDirection) {
+  return (a: JobRow, b: JobRow) => {
+    const comparison = (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
+    if (comparison !== 0) return direction === "desc" ? comparison : -comparison;
+    return byEffectiveScore(a, b);
+  };
 }
 
 function ReorderableJobList({
@@ -427,6 +438,7 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
   const [location, setLocation] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
+  const [seenSort, setSeenSort] = useState<SeenSortDirection | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -458,12 +470,14 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
       acc[key].push(job);
       return acc;
     }, {});
-    // Rank within each role group by effective (AI-first) score.
+    const sortJobs = seenSort ? bySeenDate(seenSort) : byEffectiveScore;
+    // Rank within each role group by effective (AI-first) score by default, or
+    // by last-seen date when the Seen header is toggled.
     for (const key of Object.keys(groups)) {
-      groups[key].sort(byEffectiveScore);
+      groups[key].sort(sortJobs);
     }
     return groups;
-  }, [filtered]);
+  }, [filtered, seenSort]);
 
   const reorderable = reorderableStatuses.has(status);
   const bucketJobs = useMemo(
@@ -591,7 +605,22 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
                         <th>Location</th>
                         <th>Status</th>
                         <th>Sponsor</th>
-                        <th>Seen</th>
+                        <th
+                          aria-sort={
+                            seenSort === "asc" ? "ascending" : seenSort === "desc" ? "descending" : "none"
+                          }
+                        >
+                          <button
+                            className={seenSort ? "th-sort is-active" : "th-sort"}
+                            type="button"
+                            onClick={() => setSeenSort((current) => (current === "desc" ? "asc" : "desc"))}
+                            title={seenSort === "desc" ? "Sort oldest first" : "Sort newest first"}
+                            aria-label={seenSort === "desc" ? "Sort seen date ascending" : "Sort seen date descending"}
+                          >
+                            <span>Seen</span>
+                            {seenSort === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                          </button>
+                        </th>
                         <th>Actions</th>
                       </tr>
                     </thead>

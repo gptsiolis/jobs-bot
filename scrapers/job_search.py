@@ -41,6 +41,7 @@ JOB_SEARCH_LOCATIONS = [
     "Austin, TX",
     "Washington, DC",
     "Chicago, IL",
+    "Toronto, ON",
 ]
 
 SENIOR_HARD_BLOCKS = (

@@ -154,6 +154,7 @@ class FilterTests(unittest.TestCase):
             "United States, Remote",
             "New York, NY",
             "San Francisco, CA",
+            "Toronto, ON, Canada",
             "Indianapolis, IN (Remote)",  # US remote; must not be flagged non-US
             "Milwaukee, WI (Remote)",     # must not match "uk" in Milwaukee
         ]
