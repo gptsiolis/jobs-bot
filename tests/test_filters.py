@@ -35,7 +35,6 @@ class FilterTests(unittest.TestCase):
         strong_titles = [
             "Operations Associate",
             "Business Operations Analyst",
-            "Program Coordinator",
         ]
         for title in strong_titles:
             with self.subTest(title=title):
@@ -85,6 +84,12 @@ class FilterTests(unittest.TestCase):
                 "ExampleCo",
             )
         )
+
+    def test_coordinator_titles_are_excluded(self):
+        for title in ["Workplace Coordinator", "Office Coordinator", "Program Coordinator"]:
+            with self.subTest(title=title):
+                self.assertFalse(filters.passes_watchlist(title, "New York, NY", "ExampleCo"))
+                self.assertFalse(filters.passes_discovery(title, "Remote", "ExampleCo"))
 
     def test_positive_experience_description_ranks_strong(self):
         metadata = filters.fit_metadata(

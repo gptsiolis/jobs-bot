@@ -130,6 +130,22 @@ class JobSearchTests(unittest.TestCase):
         self.assertEqual(record["visibility"], "hidden")
         self.assertIn("low-quality broad-search source", record["fit_reasons"])
 
+    def test_coordinator_title_is_hidden(self):
+        raw = {
+            "job_id": "coordinator",
+            "title": "Program Coordinator",
+            "company_name": "ExampleCo",
+            "location": "New York, NY",
+            "description": "Entry level operations role at a SaaS software company.",
+        }
+
+        job = job_search.normalize_job(raw, "business operations analyst", "New York, NY")
+        record = normalize_job_record(job)
+
+        self.assertEqual(job["fit_bucket"], "reject")
+        self.assertEqual(record["visibility"], "hidden")
+        self.assertIn("excluded title keyword", record["fit_reasons"])
+
     def test_scrape_deduplicates_company_title_location_variants(self):
         os.environ["JOB_SEARCH_DAILY_REQUEST_LIMIT"] = "1"
         payload = {

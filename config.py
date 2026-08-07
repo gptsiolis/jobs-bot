@@ -228,6 +228,7 @@ EXCLUDE_KEYWORDS = [
     "scientist", "qa ", "sdet", "warehouse", "fulfillment",
     "logistics", "supply chain", "inventory", "distribution",
     "fleet", "driver", "facilities", "manufacturing",
+    "coordinator",
 ]
 
 # Full-time search only. These title terms are excluded even if a posting

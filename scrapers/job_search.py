@@ -252,6 +252,8 @@ def _hard_reject_reasons(title, location, description, employer_name=""):
         reasons.append("warehouse/logistics operations")
     if filters.is_disallowed_investment_role(title, description, employer_name):
         reasons.append("investment role outside art/collectibles/crypto")
+    if filters.is_excluded_keyword(title):
+        reasons.append("excluded title keyword")
     if filters.compensation_below_floor(description):
         reasons.append("compensation below floor")
     if filters.is_internship(title):
