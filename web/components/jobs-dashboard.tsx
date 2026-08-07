@@ -211,7 +211,17 @@ function JobActions({ job }: { job: JobRow }) {
 }
 
 const reorderableStatuses = new Set(["saved", "applied", "applied_messaged"]);
-type SeenSortDirection = "desc" | "asc";
+type SortField = "seen" | "sponsor";
+type SortDirection = "desc" | "asc";
+type TableSort = { field: SortField; direction: SortDirection };
+
+const sponsorSortRank: Record<string, number> = {
+  strong_history: 0,
+  some_history: 1,
+  unknown_no_ban: 2,
+  unknown: 2,
+  explicit_no: 3
+};
 
 // The score we rank/display by: the personalized AI fit score (from enrich.py)
 // when a job has been enriched, otherwise the deterministic keyword score. The
@@ -237,11 +247,44 @@ function byManualRank(a: JobRow, b: JobRow) {
   return byEffectiveScore(a, b);
 }
 
-function bySeenDate(direction: SeenSortDirection) {
+function compareSeenDate(a: JobRow, b: JobRow, direction: SortDirection) {
+  const comparison = (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
+  return direction === "desc" ? comparison : -comparison;
+}
+
+function compareSponsorHistory(a: JobRow, b: JobRow, direction: SortDirection) {
+  const ar = sponsorSortRank[a.sponsor_tier] ?? sponsorSortRank.unknown_no_ban;
+  const br = sponsorSortRank[b.sponsor_tier] ?? sponsorSortRank.unknown_no_ban;
+  const comparison = ar - br;
+  return direction === "desc" ? comparison : -comparison;
+}
+
+function compareBySort(a: JobRow, b: JobRow, sort: TableSort) {
+  if (sort.field === "seen") return compareSeenDate(a, b, sort.direction);
+  return compareSponsorHistory(a, b, sort.direction);
+}
+
+function byTableSort(sorts: TableSort[]) {
   return (a: JobRow, b: JobRow) => {
-    const comparison = (b.last_seen_at || "").localeCompare(a.last_seen_at || "");
-    if (comparison !== 0) return direction === "desc" ? comparison : -comparison;
+    for (const sort of sorts) {
+      const comparison = compareBySort(a, b, sort);
+      if (comparison !== 0) return comparison;
+    }
     return byEffectiveScore(a, b);
+  };
+}
+
+function nextSortDirection(field: SortField, current: TableSort[]): SortDirection {
+  const existing = current.find((sort) => sort.field === field);
+  if (!existing) return "desc";
+  return existing.direction === "desc" ? "asc" : "desc";
+}
+
+function sortStateFor(field: SortField, sorts: TableSort[]) {
+  const index = sorts.findIndex((sort) => sort.field === field);
+  return {
+    sort: index === -1 ? null : sorts[index],
+    priority: index === -1 ? null : index + 1
   };
 }
 
@@ -438,7 +481,14 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
   const [location, setLocation] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [selectedId, setSelectedId] = useState(jobs[0]?.job_id || "");
-  const [seenSort, setSeenSort] = useState<SeenSortDirection | null>(null);
+  const [tableSorts, setTableSorts] = useState<TableSort[]>([]);
+
+  const updateTableSort = useCallback((field: SortField) => {
+    setTableSorts((current) => {
+      const next: TableSort = { field, direction: nextSortDirection(field, current) };
+      return [next, ...current.filter((sort) => sort.field !== field)].slice(0, 2);
+    });
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -461,7 +511,6 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
   }, [jobs, query, status, sponsor, fit, location, showHidden]);
 
   const selected = filtered.find((job) => job.job_id === selectedId) || filtered[0] || null;
-  const hiddenCount = jobs.filter((job) => job.visibility === "hidden" && job.status === "new").length;
 
   const grouped = useMemo(() => {
     const groups = filtered.reduce<Record<string, JobRow[]>>((acc, job) => {
@@ -470,14 +519,17 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
       acc[key].push(job);
       return acc;
     }, {});
-    const sortJobs = seenSort ? bySeenDate(seenSort) : byEffectiveScore;
+    const sortJobs = tableSorts.length ? byTableSort(tableSorts) : byEffectiveScore;
     // Rank within each role group by effective (AI-first) score by default, or
-    // by last-seen date when the Seen header is toggled.
+    // by the active sortable headers. Header click order controls priority.
     for (const key of Object.keys(groups)) {
       groups[key].sort(sortJobs);
     }
     return groups;
-  }, [filtered, seenSort]);
+  }, [filtered, tableSorts]);
+
+  const sponsorSortState = sortStateFor("sponsor", tableSorts);
+  const seenSortState = sortStateFor("seen", tableSorts);
 
   const reorderable = reorderableStatuses.has(status);
   const bucketJobs = useMemo(
@@ -571,7 +623,6 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
           />
           <span>Show lower-ranked candidates</span>
         </label>
-        <span className="muted">{hiddenCount} hidden new jobs</span>
       </div>
 
       <div className="content-grid">
@@ -604,21 +655,66 @@ export function JobsDashboard({ jobs, contacts }: { jobs: JobRow[]; contacts: Co
                         <th>Company</th>
                         <th>Location</th>
                         <th>Status</th>
-                        <th>Sponsor</th>
                         <th
                           aria-sort={
-                            seenSort === "asc" ? "ascending" : seenSort === "desc" ? "descending" : "none"
+                            sponsorSortState.sort?.direction === "asc"
+                              ? "ascending"
+                              : sponsorSortState.sort?.direction === "desc"
+                                ? "descending"
+                                : "none"
                           }
                         >
                           <button
-                            className={seenSort ? "th-sort is-active" : "th-sort"}
+                            className={sponsorSortState.sort ? "th-sort is-active" : "th-sort"}
                             type="button"
-                            onClick={() => setSeenSort((current) => (current === "desc" ? "asc" : "desc"))}
-                            title={seenSort === "desc" ? "Sort oldest first" : "Sort newest first"}
-                            aria-label={seenSort === "desc" ? "Sort seen date ascending" : "Sort seen date descending"}
+                            onClick={() => updateTableSort("sponsor")}
+                            title={
+                              sponsorSortState.sort?.direction === "desc"
+                                ? "Sort weakest sponsor history first"
+                                : "Sort strongest sponsor history first"
+                            }
+                            aria-label={
+                              sponsorSortState.sort?.direction === "desc"
+                                ? "Sort sponsor history ascending"
+                                : "Sort sponsor history descending"
+                            }
+                          >
+                            <span>Sponsor</span>
+                            {sponsorSortState.sort?.direction === "asc" ? (
+                              <ArrowUp size={13} />
+                            ) : (
+                              <ArrowDown size={13} />
+                            )}
+                            {sponsorSortState.priority ? (
+                              <span className="sort-priority">{sponsorSortState.priority}</span>
+                            ) : null}
+                          </button>
+                        </th>
+                        <th
+                          aria-sort={
+                            seenSortState.sort?.direction === "asc"
+                              ? "ascending"
+                              : seenSortState.sort?.direction === "desc"
+                                ? "descending"
+                                : "none"
+                          }
+                        >
+                          <button
+                            className={seenSortState.sort ? "th-sort is-active" : "th-sort"}
+                            type="button"
+                            onClick={() => updateTableSort("seen")}
+                            title={seenSortState.sort?.direction === "desc" ? "Sort oldest first" : "Sort newest first"}
+                            aria-label={
+                              seenSortState.sort?.direction === "desc"
+                                ? "Sort seen date ascending"
+                                : "Sort seen date descending"
+                            }
                           >
                             <span>Seen</span>
-                            {seenSort === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                            {seenSortState.sort?.direction === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                            {seenSortState.priority ? (
+                              <span className="sort-priority">{seenSortState.priority}</span>
+                            ) : null}
                           </button>
                         </th>
                         <th>Actions</th>
