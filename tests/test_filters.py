@@ -91,6 +91,20 @@ class FilterTests(unittest.TestCase):
                 self.assertFalse(filters.passes_watchlist(title, "New York, NY", "ExampleCo"))
                 self.assertFalse(filters.passes_discovery(title, "Remote", "ExampleCo"))
 
+    def test_people_roles_are_excluded(self):
+        blocked = [
+            "People Operations Associate",
+            "Human Resources Analyst",
+            "HR Business Partner",
+            "Talent Acquisition Associate",
+            "Recruiting Operations Analyst",
+            "Recruiter",
+        ]
+        for title in blocked:
+            with self.subTest(title=title):
+                self.assertFalse(filters.passes_watchlist(title, "New York, NY", "ExampleCo"))
+                self.assertFalse(filters.passes_discovery(title, "Remote", "ExampleCo"))
+
     def test_positive_experience_description_ranks_strong(self):
         metadata = filters.fit_metadata(
             "Operations Analyst",
