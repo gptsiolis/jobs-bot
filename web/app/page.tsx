@@ -68,7 +68,7 @@ export default async function HomePage() {
     supabase
       .from("status_suggestions")
       .select(
-        "id,job_id,suggested_status,current_status,decision,confidence,evidence,email_subject,email_from,created_at,jobs(title,company)"
+        "id,job_id,suggested_status,current_status,decision,confidence,evidence,email_subject,email_from,gmail_thread_id,gmail_message_id,created_at,jobs(title,company)"
       )
       .eq("resolved", false)
       .order("created_at", { ascending: false })

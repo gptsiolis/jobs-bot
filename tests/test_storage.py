@@ -22,11 +22,16 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self):
+    def __init__(self, status_suggestions=None):
         self.calls = []
+        self.status_suggestions = status_suggestions or []
 
     def request(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs))
+        if "/rest/v1/status_suggestions?select=id" in url:
+            return FakeResponse(self.status_suggestions)
+        if url.endswith("/rest/v1/status_suggestions?on_conflict=gmail_message_id,job_id"):
+            return FakeResponse([{"id": "suggestion-1"}])
         if url.endswith("/rest/v1/rpc/archive_unmatched_new_jobs"):
             return FakeResponse(17)
         if url.endswith("/rest/v1/rpc/reject_stale_applied_jobs"):
@@ -203,6 +208,45 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(method, "POST")
         self.assertTrue(url.endswith("/rest/v1/rpc/archive_unmatched_new_jobs"))
         self.assertEqual(kwargs["json"]["current_job_ids"], ["greenhouse-123"])
+
+    def test_status_suggestion_skips_existing_thread_for_job(self):
+        session = FakeSession(status_suggestions=[{"id": "existing"}])
+        store = SupabaseJobStore(
+            url="https://example.supabase.co",
+            key="service-role",
+            session=session,
+        )
+
+        result = store.insert_status_suggestion({
+            "job_id": "job-1",
+            "suggested_status": "next_round",
+            "gmail_thread_id": "thread-1",
+            "gmail_message_id": "message-2",
+        })
+
+        self.assertIsNone(result)
+        self.assertEqual(len(session.calls), 1)
+        self.assertIn("gmail_thread_id=eq.thread-1", session.calls[0][1])
+
+    def test_status_suggestion_inserts_when_thread_is_new(self):
+        session = FakeSession()
+        store = SupabaseJobStore(
+            url="https://example.supabase.co",
+            key="service-role",
+            session=session,
+        )
+
+        store.insert_status_suggestion({
+            "job_id": "job-1",
+            "suggested_status": "next_round",
+            "gmail_thread_id": "thread-1",
+            "gmail_message_id": "message-1",
+        })
+
+        self.assertEqual(len(session.calls), 2)
+        self.assertTrue(session.calls[1][1].endswith(
+            "/rest/v1/status_suggestions?on_conflict=gmail_message_id,job_id"
+        ))
 
 
 class StaleAppliedStorageTests(unittest.TestCase):

@@ -551,6 +551,18 @@ class SupabaseJobStore:
         )
 
     def insert_status_suggestion(self, suggestion):
+        thread_id = suggestion.get("gmail_thread_id")
+        job_id = suggestion.get("job_id")
+        if thread_id and job_id:
+            existing = self._request(
+                "GET",
+                "/rest/v1/status_suggestions?select=id"
+                f"&job_id=eq.{quote(str(job_id), safe='')}"
+                f"&gmail_thread_id=eq.{quote(str(thread_id), safe='')}"
+                "&limit=1",
+            ) or []
+            if existing:
+                return None
         return self._request(
             "POST",
             "/rest/v1/status_suggestions?on_conflict=gmail_message_id,job_id",

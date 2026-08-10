@@ -127,6 +127,8 @@ export type StatusSuggestion = {
   evidence: string | null;
   email_subject: string | null;
   email_from: string | null;
+  gmail_thread_id: string | null;
+  gmail_message_id: string | null;
   created_at: string;
   jobs: { title: string; company: string } | null;
 };

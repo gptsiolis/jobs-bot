@@ -312,19 +312,23 @@ def process_inbox(dry_run=False):
             if dry_run:
                 continue
 
+            inserted_suggestion = False
             if confidence >= threshold and job["status"] != new_status:
                 store.set_job_status(job["job_id"], new_status)
                 store.log_job_note_event(job["job_id"], "email_auto_update",
                                          job["status"], new_status, note)
-                store.insert_status_suggestion(_suggestion(
+                inserted_suggestion = store.insert_status_suggestion(_suggestion(
                     job, new_status, decision, confidence, evidence, email,
-                    auto_applied=True, resolved=True, resolution="auto"))
+                    auto_applied=True, resolved=True, resolution="auto")) is not None
                 stats["auto_applied"] += 1
             else:
-                store.insert_status_suggestion(_suggestion(
+                inserted_suggestion = store.insert_status_suggestion(_suggestion(
                     job, new_status, decision, confidence, evidence, email,
-                    auto_applied=False, resolved=False))
-                stats["suggested"] += 1
+                    auto_applied=False, resolved=False)) is not None
+                if inserted_suggestion:
+                    stats["suggested"] += 1
+                else:
+                    stats["skipped"] += 1
 
             store.record_processed_email(message_id, email["thread_id"],
                                          job_id=job["job_id"], decision=decision,

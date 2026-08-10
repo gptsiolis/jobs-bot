@@ -9,11 +9,31 @@ const statusLabels: Record<string, string> = {
   rejected: "Rejected"
 };
 
+const actionLabels: Record<string, string> = {
+  next_round: "Move to Next Round",
+  rejected: "Mark Rejected"
+};
+
+function suggestionChainKey(suggestion: StatusSuggestion) {
+  return [
+    suggestion.job_id,
+    suggestion.gmail_thread_id || suggestion.gmail_message_id || suggestion.id
+  ].join(":");
+}
+
 // Suggested status changes the email agent surfaced but did not auto-apply
-// (lower confidence). Each is one inbound email proposing one job moves to
-// Next Round or Rejected; the user approves or dismisses.
+// (lower confidence). The UI collapses repeated messages from the same Gmail
+// thread/job so a recruiter chain only creates one visible review item.
 export function StatusSuggestions({ suggestions }: { suggestions: StatusSuggestion[] }) {
-  if (!suggestions.length) {
+  const seenSuggestions = new Set<string>();
+  const visibleSuggestions = suggestions.filter((suggestion) => {
+    const key = suggestionChainKey(suggestion);
+    if (seenSuggestions.has(key)) return false;
+    seenSuggestions.add(key);
+    return true;
+  });
+
+  if (!visibleSuggestions.length) {
     return null;
   }
 
@@ -22,13 +42,14 @@ export function StatusSuggestions({ suggestions }: { suggestions: StatusSuggesti
       <div className="status-suggestions-head">
         <Mail size={16} />
         <span>Suggested updates from your inbox</span>
-        <span className="muted">{suggestions.length}</span>
+        <span className="muted">{visibleSuggestions.length}</span>
       </div>
       <ul className="status-suggestions-list">
-        {suggestions.map((s) => {
+        {visibleSuggestions.map((s) => {
           const company = s.jobs?.company || "";
           const title = s.jobs?.title || s.job_id;
           const pct = Math.round((s.confidence || 0) * 100);
+          const actionLabel = actionLabels[s.suggested_status] || `Mark ${statusLabels[s.suggested_status] || s.suggested_status}`;
           return (
             <li key={s.id} className="status-suggestion">
               <div className="status-suggestion-main">
@@ -54,9 +75,9 @@ export function StatusSuggestions({ suggestions }: { suggestions: StatusSuggesti
                   <input type="hidden" name="id" value={s.id} />
                   <input type="hidden" name="job_id" value={s.job_id} />
                   <input type="hidden" name="suggested_status" value={s.suggested_status} />
-                  <button className="status-button" type="submit" title="Apply this update">
+                  <button className="status-button" type="submit" title={actionLabel}>
                     <CheckCircle2 size={16} />
-                    <span>Apply</span>
+                    <span>{actionLabel}</span>
                   </button>
                 </form>
                 <form action={dismissStatusSuggestion}>
